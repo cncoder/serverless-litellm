@@ -1,0 +1,42 @@
+# Terraform state & secrets
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+.terraform/
+.terraform.lock.hcl
+.terraform-outputs.json
+terraform.tfvars          # 包含真实域名/证书 ARN，使用 terraform.tfvars.example
+crash.log
+*.tfplan
+tfplan
+
+# Kubernetes secrets
+kubernetes/secret.yaml
+kubernetes/secret-*.yaml
+
+# AWS credentials / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+aws-credentials*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Scripts output
+dynamodb-backup-*.json
+
+# Test results (may contain sensitive data)
+test-results/

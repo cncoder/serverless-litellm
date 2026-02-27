@@ -1,0 +1,79 @@
+# ====================================================================
+# LiteLLM Serverless on EKS - Terraform 配置示例
+# 复制此文件为 terraform.tfvars 并填入实际值
+# ====================================================================
+
+# ========================================
+# 项目基础配置
+# ========================================
+project_name = "litellm"
+environment  = "prod"
+aws_region   = "us-west-2"
+
+# ========================================
+# 网络配置
+# ========================================
+# --- 方式 1: 创建新 VPC（默认） ---
+create_vpc         = true
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-west-2a", "us-west-2b"]
+
+# --- 方式 2: 使用已有 VPC ---
+# create_vpc                 = false
+# existing_vpc_id            = "vpc-0123456789abcdef0"
+# existing_public_subnet_ids  = ["subnet-aaa", "subnet-bbb"]
+# existing_private_subnet_ids = ["subnet-ccc", "subnet-ddd"]
+
+# ========================================
+# EKS 配置
+# ========================================
+eks_version = "1.31"
+
+# ========================================
+# 域名与 SSL 配置
+# ========================================
+# LiteLLM API 域名
+litellm_host = "litellm.example.com"
+
+# Bot/Webhook 域名（可选）
+bot_host = "bot.example.com"
+
+# ACM 证书 ARN
+#
+# 两阶段部署说明（域名在 Cloudflare 或其他 DNS 时）:
+#
+# 阶段 1 - 先部署（无证书，HTTP only）:
+#   acm_certificate_arn = ""
+#   terraform apply
+#   → 部署完成后获取 ALB DNS，将域名 CNAME 指向 ALB
+#   → 在 AWS ACM 申请证书，选 DNS 验证
+#   → 在 Cloudflare 添加 ACM 给出的 CNAME 验证记录
+#   → 等待证书状态变为 Issued（通常 5-30 分钟）
+#
+# 阶段 2 - 切换 HTTPS:
+#   acm_certificate_arn = "arn:aws:acm:eu-central-1:123456789012:certificate/xxx"
+#   terraform apply
+#   → 自动切换为 HTTPS Ingress，HTTP 监听器被替换
+#
+acm_certificate_arn = ""
+
+# ========================================
+# Cognito 认证配置（可选）
+# ========================================
+enable_cognito = false
+
+# 启用 Cognito 时需要填写以下配置:
+# cognito_user_pool_arn       = "arn:aws:cognito-idp:us-west-2:123456789012:userpool/us-west-2_xxx"
+# cognito_user_pool_client_id = "1234567890abcdefghijklmnop"
+# cognito_user_pool_domain    = "your-domain-prefix"
+
+# ========================================
+# WAF 防护配置（可选）
+# ========================================
+enable_waf = false
+
+# ========================================
+# Kubernetes 配置
+# ========================================
+litellm_namespace       = "litellm"
+litellm_service_account = "litellm-sa"

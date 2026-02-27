@@ -1,0 +1,148 @@
+# ====================================================================
+# LiteLLM Ingress 配置 - HTTP only 版本（无 ACM 证书时使用）
+# ====================================================================
+#
+# 适用场景:
+#   客户域名在 Cloudflare 或其他 DNS 服务商，ACM 证书尚未签发时，
+#   先用此文件跑通服务。待证书 issued 后，填写 acm_certificate_arn
+#   重新 terraform apply 即可自动切换到 ingress.yaml（HTTPS 版本）。
+#
+# 切换步骤:
+#   1. DNS CNAME 指向 ALB 后，DNS 验证通过，ACM 证书变为 Issued
+#   2. 在 terraform.tfvars 填入 acm_certificate_arn
+#   3. terraform apply —— 自动切换到 HTTPS Ingress
+#
+# 变量占位符（由 terraform post-deploy 通过 envsubst 替换）:
+#   ${LITELLM_HOST}  - LiteLLM API/UI 域名
+#   ${BOT_HOST}      - Webhook 域名
+# ====================================================================
+
+---
+# Webhook Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: litellm-ingress-webhook
+  namespace: litellm
+  labels:
+    app: litellm
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: litellm-shared
+    alb.ingress.kubernetes.io/group.order: "5"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health/liveliness
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+spec:
+  rules:
+  - host: ${BOT_HOST}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 80
+
+---
+# API Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: litellm-ingress-api
+  namespace: litellm
+  labels:
+    app: litellm
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: litellm-shared
+    alb.ingress.kubernetes.io/group.order: "10"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health/liveliness
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+spec:
+  rules:
+  - host: ${LITELLM_HOST}
+    http:
+      paths:
+      - path: /chat/completions
+        pathType: Exact
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 80
+      - path: /v1
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 80
+      - path: /key
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 80
+      - path: /model
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 80
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 80
+
+---
+# UI Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: litellm-ingress-ui
+  namespace: litellm
+  labels:
+    app: litellm
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: litellm-shared
+    alb.ingress.kubernetes.io/group.order: "50"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health/liveliness
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+spec:
+  rules:
+  - host: ${LITELLM_HOST}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm
+            port:
+              number: 80

@@ -1,0 +1,108 @@
+# ====================================================================
+# LiteLLM Deployment - 核心应用部署配置
+# ====================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm-deployment
+  namespace: litellm
+  labels:
+    app: litellm
+spec:
+  replicas: 2                                    # 初始副本数 2
+
+  # 滚动更新策略
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                                # 最多额外创建 1 个 Pod
+      maxUnavailable: 0                          # 更新时不允许不可用
+
+  selector:
+    matchLabels:
+      app: litellm
+
+  template:
+    metadata:
+      labels:
+        app: litellm
+    spec:
+      # 使用 EKS Pod Identity 服务账户
+      serviceAccountName: litellm-sa
+
+      containers:
+      - name: litellm
+        image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/litellm-prod:latest
+        imagePullPolicy: Always
+
+        # 容器端口
+        ports:
+        - name: http
+          containerPort: 4000
+          protocol: TCP
+
+        # 启动参数
+        args:
+          - "--config"
+          - "/app/config.yaml"
+          - "--detailed_debug"
+
+        # 环境变量 - 从 Secret 注入
+        envFrom:
+        - secretRef:
+            name: litellm-secrets
+
+        # 额外的环境变量配置
+        env:
+        - name: DYNAMODB_API_KEYS_TABLE
+          valueFrom:
+            secretKeyRef:
+              name: litellm-secrets
+              key: DYNAMODB_API_KEYS_TABLE
+        - name: AWS_REGION
+          valueFrom:
+            secretKeyRef:
+              name: litellm-secrets
+              key: AWS_REGION
+
+        # 配置文件挂载
+        volumeMounts:
+        - name: config
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+          readOnly: true
+
+        # 资源限制 (Fargate: requests = limits)
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+
+        # 存活探针 - 检查容器是否存活
+        livenessProbe:
+          httpGet:
+            path: /health/liveliness
+            port: 4000
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        # 就绪探针 - 检查容器是否准备好接收流量
+        readinessProbe:
+          httpGet:
+            path: /health/liveliness
+            port: 4000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+      # 配置文件卷
+      volumes:
+      - name: config
+        configMap:
+          name: litellm-config

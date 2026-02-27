@@ -1,0 +1,51 @@
+# ====================================================================
+# LiteLLM 水平 Pod 自动伸缩 (HPA) 配置
+# ====================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: litellm-hpa
+  namespace: litellm
+  labels:
+    app: litellm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: litellm-deployment
+
+  # 副本数范围
+  minReplicas: 2
+  maxReplicas: 4
+
+  # 指标配置
+  metrics:
+  # CPU 使用率目标 70%
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+
+  # 伸缩行为配置
+  behavior:
+    # 缩容策略 - 保守缩容，避免频繁波动
+    scaleDown:
+      stabilizationWindowSeconds: 300           # 稳定窗口 5 分钟
+      policies:
+      - type: Percent
+        value: 10                               # 每 60 秒最多缩容 10%
+        periodSeconds: 60
+
+    # 扩容策略 - 快速扩容，应对突发流量
+    scaleUp:
+      stabilizationWindowSeconds: 0             # 立即扩容
+      policies:
+      - type: Percent
+        value: 100                              # 每 30 秒最多扩容 100% (翻倍)
+        periodSeconds: 30
+      - type: Pods
+        value: 2                                # 每 60 秒最多增加 2 个 Pod
+        periodSeconds: 60
+      selectPolicy: Max                         # 选择扩容幅度最大的策略

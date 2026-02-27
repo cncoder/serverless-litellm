@@ -1,0 +1,187 @@
+# ====================================================================
+# LiteLLM Ingress 配置 - 三层路由策略
+# ====================================================================
+#
+# 架构说明:
+# 1. litellm-ingress-webhook (优先级 5)  - Webhook 回调路径，无需认证 (bot host)
+# 2. litellm-ingress-api     (优先级 10) - API 路径，无需认证 (litellm host)
+# 3. litellm-ingress-ui      (优先级 50) - UI 管理界面，需要 Cognito 认证 (litellm host)
+#
+# 所有 Ingress 共享同一个 ALB (通过 group.name 注解)
+#
+# 变量占位符（由 terraform post-deploy 通过 envsubst 替换）:
+#   ${LITELLM_HOST}              - LiteLLM API/UI 域名
+#   ${BOT_HOST}                  - Webhook 域名
+#   ${ACM_CERTIFICATE_ARN}       - ACM 证书 ARN
+#   ${COGNITO_USER_POOL_ARN}     - Cognito User Pool ARN
+#   ${COGNITO_USER_POOL_CLIENT_ID} - Cognito Client ID
+#   ${COGNITO_USER_POOL_DOMAIN}  - Cognito 域名
+# ====================================================================
+
+---
+# ====================================================================
+# Webhook Ingress - 优先级最高，处理 Webhook 回调请求
+# ====================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: litellm-ingress-webhook
+  namespace: litellm
+  labels:
+    app: litellm
+  annotations:
+    # ALB 基础配置
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: litellm-shared        # 共享 ALB 组名
+    alb.ingress.kubernetes.io/group.order: "5"                  # 优先级 5
+
+    # HTTPS 配置
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: ${ACM_CERTIFICATE_ARN}
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+
+    # 健康检查
+    alb.ingress.kubernetes.io/healthcheck-path: /health/liveliness
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+spec:
+  rules:
+  - host: ${BOT_HOST}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm-service
+            port:
+              number: 80
+
+---
+# ====================================================================
+# API Ingress - 处理 OpenAI 兼容 API 和管理端点
+# ====================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: litellm-ingress-api
+  namespace: litellm
+  labels:
+    app: litellm
+  annotations:
+    # ALB 基础配置
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: litellm-shared        # 共享 ALB 组名
+    alb.ingress.kubernetes.io/group.order: "10"                 # 优先级 10
+
+    # HTTPS 配置
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: ${ACM_CERTIFICATE_ARN}
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+
+    # 健康检查
+    alb.ingress.kubernetes.io/healthcheck-path: /health/liveliness
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+spec:
+  rules:
+  - host: ${LITELLM_HOST}
+    http:
+      paths:
+      # OpenAI 兼容端点
+      - path: /chat/completions
+        pathType: Exact
+        backend:
+          service:
+            name: litellm-service
+            port:
+              number: 80
+
+      # v1 API 端点
+      - path: /v1
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm-service
+            port:
+              number: 80
+
+      # 密钥管理端点
+      - path: /key
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm-service
+            port:
+              number: 80
+
+      # 模型管理端点
+      - path: /model
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm-service
+            port:
+              number: 80
+
+      # 健康检查端点
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm-service
+            port:
+              number: 80
+
+---
+# ====================================================================
+# UI Ingress - 管理界面，无认证版本
+# ====================================================================
+# 注意: 当 enable_cognito=true 时，此 Ingress 会被 ingress-cognito.yaml 替换
+# ====================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: litellm-ingress-ui
+  namespace: litellm
+  labels:
+    app: litellm
+  annotations:
+    # ALB 基础配置
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: litellm-shared        # 共享 ALB 组名
+    alb.ingress.kubernetes.io/group.order: "50"                 # 优先级 50 (最低)
+
+    # HTTPS 配置
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: ${ACM_CERTIFICATE_ARN}
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+
+    # 健康检查
+    alb.ingress.kubernetes.io/healthcheck-path: /health/liveliness
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+spec:
+  rules:
+  - host: ${LITELLM_HOST}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm-service
+            port:
+              number: 80
