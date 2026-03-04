@@ -27,7 +27,7 @@ spec:
       labels:
         app: litellm
     spec:
-      # 使用 EKS Pod Identity 服务账户
+      # 使用 IRSA（IAM Roles for Service Accounts）服务账户
       serviceAccountName: litellm-sa
 
       containers:
@@ -54,11 +54,6 @@ spec:
 
         # 额外的环境变量配置
         env:
-        - name: DYNAMODB_API_KEYS_TABLE
-          valueFrom:
-            secretKeyRef:
-              name: litellm-secrets
-              key: DYNAMODB_API_KEYS_TABLE
         - name: AWS_REGION
           valueFrom:
             secretKeyRef:

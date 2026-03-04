@@ -7,12 +7,11 @@
 1. [容器平台问题](#1-容器平台问题)
 2. [网络和负载均衡](#2-网络和负载均衡)
 3. [基础设施超时](#3-基础设施超时)
-4. [DynamoDB 认证问题](#4-dynamodb-认证问题)
-5. [Fargate 特有问题](#5-fargate-特有问题)
-6. [AWS 权限和服务](#6-aws-权限和服务)
-7. [配置和更新](#7-配置和更新)
-8. [脚本兼容性](#8-脚本兼容性)
-9. [常用调试命令](#9-常用调试命令)
+4. [Fargate 特有问题](#4-fargate-特有问题)
+5. [AWS 权限和服务](#5-aws-权限和服务)
+6. [配置和更新](#6-配置和更新)
+7. [脚本兼容性](#7-脚本兼容性)
+8. [常用调试命令](#8-常用调试命令)
 
 ---
 
@@ -248,7 +247,7 @@ Error: timeout while waiting for deployment rollout to complete
 LiteLLM 启动流程:
 1. Fargate 分配计算资源并启动容器 (30-60秒)
 2. 容器启动并初始化 (5-10秒)
-3. 连接 DynamoDB 并验证表存在 (2-5秒)
+3. 连接 PostgreSQL 数据库 (2-5秒)
 4. 加载模型配置和验证 Bedrock 连接 (20-30秒)
 5. 启动 FastAPI 服务器 (5-10秒)
 
@@ -318,198 +317,7 @@ curl http://localhost:4000/health
 
 ---
 
-## 4. DynamoDB 认证问题
-
-### 4.1 API Key 认证失败 - Key Not Found
-
-**现象**
-
-```bash
-$ curl -X POST https://litellm.example.com/v1/chat/completions \
-  -H "Authorization: Bearer sk-xxx" \
-  -d '{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"Hi"}]}'
-
-{"error":{"message":"Invalid API Key","code":"invalid_api_key"}}
-```
-
-**根本原因**
-
-1. API Key 不存在于 DynamoDB 表中
-2. DynamoDB 表名配置错误
-3. Pod Identity 缺少 DynamoDB 读权限
-
-**排查步骤**
-
-```bash
-# 1. 验证 DynamoDB 表存在
-TABLE_NAME=$(terraform output -raw dynamodb_table_name)
-aws dynamodb describe-table --table-name $TABLE_NAME
-
-# 2. 检查 API Key 是否存在
-aws dynamodb get-item \
-  --table-name $TABLE_NAME \
-  --key '{"token": {"S": "sk-xxx"}}'
-
-# 3. 检查 Pod Identity 权限
-kubectl describe pod <pod-name> -n litellm | grep "service-account"
-aws eks list-pod-identity-associations --cluster-name <cluster-name>
-
-# 4. 从 Pod 内测试 DynamoDB 访问
-kubectl exec -it <pod-name> -n litellm -- sh
-apk add aws-cli
-aws dynamodb scan --table-name $TABLE_NAME --max-items 5
-```
-
-**解决方案**
-
-创建 API Key:
-
-```bash
-# 使用 manage-keys.sh 脚本
-./scripts/manage-keys.sh create \
-  --user-id test-user \
-  --models claude-sonnet-4-5,claude-haiku-4-5 \
-  --budget 10.0
-
-# 或直接使用 AWS CLI
-aws dynamodb put-item \
-  --table-name litellm-api-keys \
-  --item '{
-    "token": {"S": "sk-'$(openssl rand -hex 32)'"},
-    "user_id": {"S": "test-user"},
-    "created_at": {"N": "'$(date +%s)'"},
-    "models": {"L": [{"S": "claude-sonnet-4-5"}]}
-  }'
-```
-
-**经验教训**
-
-- DynamoDB 表名必须与环境变量 `DYNAMODB_TABLE_NAME` 一致
-- 始终验证 Pod Identity 关联和 IAM 策略
-- 使用 manage-keys.sh 脚本而非手动创建 Key
-
-### 4.2 DynamoDB 读写限流 - ProvisionedThroughputExceededException
-
-**现象**
-
-```bash
-$ kubectl logs <pod> -n litellm
-botocore.exceptions.ClientError: An error occurred (ProvisionedThroughputExceededException)
-when calling the GetItem operation: The level of configured provisioned throughput
-for the table was exceeded.
-```
-
-**根本原因**
-
-DynamoDB 表使用按需计费模式 (PAY_PER_REQUEST),但在短时间内请求量激增超过自适应容量。
-
-**排查步骤**
-
-```bash
-# 1. 检查表计费模式
-aws dynamodb describe-table --table-name litellm-api-keys \
-  --query 'Table.BillingModeSummary'
-
-# 2. 查看 CloudWatch Metrics
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/DynamoDB \
-  --metric-name UserErrors \
-  --dimensions Name=TableName,Value=litellm-api-keys \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-  --period 300 \
-  --statistics Sum
-
-# 3. 检查读写容量单位
-aws dynamodb describe-table --table-name litellm-api-keys \
-  --query 'Table.[ProvisionedThroughput,BillingModeSummary]'
-```
-
-**解决方案**
-
-1. **短期**: 等待自适应容量生效 (通常 5-30 分钟)
-2. **长期**: 如果 QPS 稳定且高,切换到预置容量模式:
-
-```bash
-aws dynamodb update-table \
-  --table-name litellm-api-keys \
-  --billing-mode PROVISIONED \
-  --provisioned-throughput ReadCapacityUnits=100,WriteCapacityUnits=20
-```
-
-**成本对比**
-
-| 模式 | 适用场景 | 月成本估算 (100 QPS) |
-|------|---------|---------------------|
-| PAY_PER_REQUEST | 流量波动大 | $60/月 |
-| PROVISIONED (100 RCU) | 流量稳定 | $35/月 |
-
-**经验教训**
-
-- 按需计费不是"无限制",仍有瞬时速率限制
-- 监控 CloudWatch 的 `ThrottledRequests` 指标
-- 高 QPS 场景建议预置容量模式
-
-### 4.3 DynamoDB 表不存在 - ResourceNotFoundException
-
-**现象**
-
-```bash
-$ kubectl logs <pod> -n litellm
-botocore.exceptions.ClientError: An error occurred (ResourceNotFoundException)
-when calling the GetItem operation: Requested resource not found
-```
-
-**根本原因**
-
-1. Terraform 未成功创建 DynamoDB 表
-2. 表名配置错误 (ConfigMap 与实际表名不匹配)
-3. 表在其他 AWS 区域
-
-**排查步骤**
-
-```bash
-# 1. 检查 Terraform 输出
-terraform output dynamodb_table_name
-
-# 2. 列出所有 DynamoDB 表
-aws dynamodb list-tables --region us-west-2
-
-# 3. 检查 ConfigMap 配置
-kubectl get configmap litellm-config -n litellm -o yaml | grep DYNAMODB
-
-# 4. 验证 AWS 区域
-kubectl exec -it <pod-name> -n litellm -- env | grep AWS_REGION
-```
-
-**解决方案**
-
-创建 DynamoDB 表:
-
-```bash
-terraform apply -target=module.dynamodb
-```
-
-或手动创建:
-
-```bash
-aws dynamodb create-table \
-  --table-name litellm-api-keys \
-  --attribute-definitions AttributeName=token,AttributeType=S \
-  --key-schema AttributeName=token,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST \
-  --region us-west-2 \
-  --tags Key=Environment,Value=production
-```
-
-**经验教训**
-
-- 始终使用 Terraform 管理 DynamoDB 表,避免手动创建
-- 表名建议使用 Terraform output 自动传递给 Kubernetes
-
----
-
-## 5. Fargate 特有问题
+## 4. Fargate 特有问题
 
 ### 5.1 Pod Pending 时间过长 - Fargate Profile 不匹配
 
@@ -714,9 +522,9 @@ readinessProbe:
 
 ---
 
-## 6. AWS 权限和服务
+## 5. AWS 权限和服务
 
-### 6.1 Bedrock 权限不足 - AccessDeniedException
+### 5.1 Bedrock 权限不足 - AccessDeniedException
 
 **现象**
 
@@ -730,36 +538,26 @@ $ curl -X POST https://litellm.example.com/v1/chat/completions \
 
 **根本原因**
 
-Pod Identity 未正确配置,或 IAM 策略缺少必要权限。
+IRSA（IAM Roles for Service Accounts）未正确配置,或 IAM 策略缺少必要权限。
 
 **排查步骤**
 
 ```bash
-# 1. 检查 Pod Identity Association
-aws eks list-pod-identity-associations --cluster-name litellm-prod
-# 应返回关联 ID
-
-# 2. 查看关联详情
-aws eks describe-pod-identity-association \
-  --cluster-name litellm-prod \
-  --association-id <id>
-# 确认 serviceAccount=litellm-sa, roleArn 正确
-
-# 3. 检查 Service Account 注解
+# 1. 检查 Service Account 注解
 kubectl get sa litellm-sa -n litellm -o yaml
 # 应包含: eks.amazonaws.com/role-arn: arn:aws:iam::...
 
-# 4. 检查 IAM Role 策略
+# 2. 检查 IAM Role 策略
 ROLE_NAME=$(kubectl get sa litellm-sa -n litellm -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}' | cut -d'/' -f2)
 aws iam get-role-policy --role-name $ROLE_NAME --policy-name LiteLLMBedrockPolicy
 # 确认包含 bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream
 
-# 5. 在 Pod 内验证凭证
+# 3. 在 Pod 内验证凭证
 kubectl exec -it <pod> -n litellm -- sh
 env | grep AWS_
 # 应显示 AWS_CONTAINER_CREDENTIALS_FULL_URI, AWS_ROLE_ARN
 
-# 6. 测试 Bedrock 调用
+# 4. 测试 Bedrock 调用
 kubectl exec -it <pod> -n litellm -- python3 -c "
 import boto3
 client = boto3.client('bedrock-runtime', region_name='us-west-2')
@@ -777,7 +575,7 @@ kubectl annotate sa litellm-sa -n litellm \
   eks.amazonaws.com/role-arn=arn:aws:iam::123456789012:role/LiteLLMBedrockRole
 ```
 
-**问题 2**: Trust Policy 不正确
+**问题 2**: Trust Policy 不正确（IRSA 使用 OIDC provider）
 
 ```json
 {
@@ -785,15 +583,12 @@ kubectl annotate sa litellm-sa -n litellm \
   "Statement": [{
     "Effect": "Allow",
     "Principal": {
-      "Service": "pods.eks.amazonaws.com"
+      "Federated": "arn:aws:iam::123456789012:oidc-provider/oidc.eks.us-west-2.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE"
     },
-    "Action": ["sts:AssumeRole", "sts:TagSession"],
+    "Action": "sts:AssumeRoleWithWebIdentity",
     "Condition": {
       "StringEquals": {
-        "aws:SourceAccount": "123456789012"
-      },
-      "ArnEquals": {
-        "aws:SourceArn": "arn:aws:eks:us-west-2:123456789012:cluster/litellm-prod"
+        "oidc.eks.us-west-2.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE:sub": "system:serviceaccount:litellm:litellm-sa"
       }
     }
   }]
@@ -820,14 +615,13 @@ kubectl annotate sa litellm-sa -n litellm \
 
 **经验教训**
 
-Pod Identity 配置涉及多个组件,逐步验证每个环节:
-1. Association 存在且正确
-2. Service Account 有注解
-3. IAM Role Trust Policy 正确
-4. IAM Role 权限策略完整
-5. Pod 内凭证正确注入
+IRSA 配置涉及多个组件,逐步验证每个环节:
+1. Service Account 有 `eks.amazonaws.com/role-arn` 注解
+2. IAM Role Trust Policy 正确（使用 OIDC provider + `sts:AssumeRoleWithWebIdentity`）
+3. IAM Role 权限策略完整
+4. Pod 内凭证正确注入
 
-### 6.2 Bedrock 模型不可用
+### 5.2 Bedrock 模型不可用
 
 **现象**
 
@@ -851,9 +645,9 @@ aws bedrock get-foundation-model-availability \
 
 ---
 
-## 7. 配置和更新
+## 6. 配置和更新
 
-### 7.1 ConfigMap 更新后 Pod 未生效
+### 6.1 ConfigMap 更新后 Pod 未生效
 
 **现象**
 
@@ -923,9 +717,9 @@ kubectl exec -it <pod> -n litellm -- env | grep LITELLM
 
 ---
 
-## 8. 脚本兼容性
+## 7. 脚本兼容性
 
-### 8.1 macOS head -n 负数不兼容
+### 7.1 macOS head -n 负数不兼容
 
 **现象**
 
@@ -984,9 +778,9 @@ BODY=$(curl -s -w "\n%{http_code}" "$URL" | ghead -n -1)
 
 ---
 
-## 9. 常用调试命令
+## 8. 常用调试命令
 
-### 9.1 Pod 状态和日志
+### 8.1 Pod 状态和日志
 
 ```bash
 # 列出所有 Pod
@@ -1052,7 +846,7 @@ aws elbv2 describe-rules --listener-arn $LISTENER_ARN \
   --output table
 ```
 
-### 9.4 Bedrock 可用性检查
+### 8.4 Bedrock 可用性检查
 
 ```bash
 # 列出可用模型
@@ -1074,45 +868,7 @@ aws bedrock-runtime invoke-model \
 cat /tmp/response.json | jq
 ```
 
-### 9.5 DynamoDB 数据测试
-
-```bash
-# 列出所有表
-aws dynamodb list-tables --region us-west-2
-
-# 查看表详情
-TABLE_NAME=$(terraform output -raw dynamodb_table_name)
-aws dynamodb describe-table --table-name $TABLE_NAME
-
-# 扫描表内容 (限制 10 条)
-aws dynamodb scan --table-name $TABLE_NAME --max-items 10
-
-# 获取单个 API Key
-aws dynamodb get-item \
-  --table-name $TABLE_NAME \
-  --key '{"token": {"S": "sk-xxx"}}'
-
-# 从 Pod 内测试 DynamoDB 访问
-kubectl exec -it <pod> -n litellm -- sh
-apk add aws-cli python3 py3-boto3
-python3 -c "
-import boto3
-dynamodb = boto3.client('dynamodb', region_name='us-west-2')
-response = dynamodb.scan(TableName='$TABLE_NAME', Limit=5)
-print(response)
-"
-
-# 检查 TTL 配置
-aws dynamodb describe-time-to-live --table-name $TABLE_NAME
-
-# 查询用户的所有 Keys (需要 GSI 或扫描)
-aws dynamodb scan \
-  --table-name $TABLE_NAME \
-  --filter-expression "user_id = :uid" \
-  --expression-attribute-values '{":uid":{"S":"test-user"}}'
-```
-
-### 9.6 ECR 镜像管理
+### 8.5 ECR 镜像管理
 
 ```bash
 # 列出 ECR 仓库
@@ -1135,7 +891,7 @@ aws ecr get-login-password --region us-west-2 | \
 docker pull <account>.dkr.ecr.us-west-2.amazonaws.com/$REPO_NAME:latest
 ```
 
-### 9.7 Fargate 和 EKS 集群状态
+### 8.6 Fargate 和 EKS 集群状态
 
 ```bash
 # 集群信息
@@ -1164,40 +920,12 @@ kubectl top pods -n litellm
 # 查看集群事件
 kubectl get events -n litellm --sort-by='.lastTimestamp'
 
-# 查看 Pod Identity Associations
-aws eks list-pod-identity-associations --cluster-name litellm-prod
-aws eks describe-pod-identity-association --cluster-name litellm-prod --association-id <id>
+# 查看 IRSA 配置
+kubectl get sa litellm -n litellm -o yaml
+# 确认 annotations 包含 eks.amazonaws.com/role-arn
 ```
 
-### 9.8 ConfigMap 和 Secret
-
-```bash
-# 集群信息
-aws eks describe-cluster --name litellm-prod \
-  --query 'cluster.{Status:status,Version:version,Endpoint:endpoint}' \
-  --output table
-
-# 节点组状态
-aws eks describe-nodegroup --cluster-name litellm-prod --nodegroup-name <nodegroup-name>
-
-# 节点列表
-kubectl get nodes -o wide
-
-# 节点资源使用
-kubectl top nodes
-
-# Pod 资源使用
-kubectl top pods -n litellm
-
-# 查看集群事件
-kubectl get events -n litellm --sort-by='.lastTimestamp'
-
-# 查看 Pod Identity Associations
-aws eks list-pod-identity-associations --cluster-name litellm-prod
-aws eks describe-pod-identity-association --cluster-name litellm-prod --association-id <id>
-```
-
-### 9.8 ConfigMap 和 Secret
+### 8.7 ConfigMap 和 Secret
 
 ```bash
 # 查看 ConfigMap
@@ -1217,7 +945,7 @@ kubectl create configmap litellm-config -n litellm \
 kubectl rollout restart deployment litellm -n litellm
 ```
 
-### 9.9 健康检查和可用性
+### 8.8 健康检查和可用性
 
 ```bash
 # 本地测试 (通过 port-forward)
@@ -1237,7 +965,7 @@ curl -X POST https://$ALB_DNS/v1/chat/completions \
   -d '{"model":"opus","messages":[{"role":"user","content":"Count to 5"}],"stream":true}'
 ```
 
-### 9.10 Terraform 状态
+### 8.9 Terraform 状态
 
 ```bash
 # 查看 Terraform 输出
@@ -1268,11 +996,10 @@ terraform graph | dot -Tpng > graph.png
 3. **Pod 日志**: `kubectl logs <pod> -n litellm` - 启动错误?
 4. **Pod 事件**: `kubectl describe pod <pod> -n litellm` - 镜像拉取失败? 调度失败?
 5. **Service 可达性**: `kubectl port-forward -n litellm svc/litellm 4000:4000` + `curl localhost:4000/health`
-6. **DynamoDB 表**: `aws dynamodb describe-table --table-name litellm-api-keys` - 表是否存在?
-7. **API Key 验证**: `aws dynamodb get-item` - Key 是否在表中?
-8. **Ingress 状态**: `kubectl get ingress -n litellm` - ALB 已创建?
-9. **ALB 健康检查**: AWS 控制台查看 Target Group 健康状态
-10. **权限验证**: 在 Pod 内运行 `env | grep AWS` 和 boto3 测试 DynamoDB 访问
+6. **数据库连接**: 检查 Pod 日志中 PostgreSQL 连接是否成功
+7. **Ingress 状态**: `kubectl get ingress -n litellm` - ALB 已创建?
+8. **ALB 健康检查**: AWS 控制台查看 Target Group 健康状态
+9. **权限验证**: 在 Pod 内运行 `env | grep AWS` 和检查 IRSA ServiceAccount 注解
 
 ---
 
@@ -1287,16 +1014,14 @@ terraform graph | dot -Tpng > graph.png
 | 0/1 Running | 健康检查失败 | 检查 Readiness Probe,Fargate 启动延迟 |
 | 502 Bad Gateway | ALB → Pod 连接失败 | Target Group 健康检查,SG 规则 |
 | 504 Gateway Timeout | 后端响应超时 | Pod 性能,超时配置,Fargate 资源 |
-| 403 Forbidden | 权限不足 | IAM 策略,Pod Identity,DynamoDB 权限 |
-| Invalid API Key | Key 不存在或过期 | 检查 DynamoDB 表,TTL 设置 |
-| ProvisionedThroughputExceededException | DynamoDB 限流 | 等待自适应容量或切换预置模式 |
-| ResourceNotFoundException | DynamoDB 表不存在 | 检查表名配置,AWS 区域 |
+| 403 Forbidden | 权限不足 | IAM 策略,IRSA 配置,Bedrock 权限 |
+| Invalid API Key | Key 不存在或过期 | 检查 LiteLLM Admin UI,PostgreSQL 数据库 |
 
 ---
 
 ## 联系和资源
 
-- **项目仓库**: [litellm-on-eks](https://github.com/your-org/litellm-on-eks)
+- **项目仓库**: [serverless-litellm](https://github.com/cncoder/serverless-litellm)
 - **LiteLLM 文档**: https://docs.litellm.ai
 - **AWS EKS 文档**: https://docs.aws.amazon.com/eks/
 - **Troubleshooting 更新**: 欢迎提交 PR 补充实际问题

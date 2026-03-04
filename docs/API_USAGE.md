@@ -5,9 +5,9 @@
 | 配置项 | 值 |
 |-------|---|
 | API Base URL | `https://litellm.example.com` |
-| 认证方式 | Bearer Token (DynamoDB custom_auth) |
-| API Key 存储 | DynamoDB 表: `litellm-api-keys` |
-| Key 创建方式 | `./scripts/manage-keys.sh` 或直接写入 DynamoDB |
+| 认证方式 | Bearer Token (LiteLLM Native Auth) |
+| API Key 存储 | RDS PostgreSQL |
+| Key 创建方式 | LiteLLM Admin UI (`/ui`) |
 
 ---
 
@@ -17,14 +17,15 @@
 |---------|------|------|
 | `claude-opus-4-6-us` | us | 最强，us 端点 |
 | `claude-opus-4-6-global` | global | 最强，global 端点 |
+| `claude-opus-4-6` | us | Opus 4.6 兼容别名 |
 | `claude-opus-4-5` | global | 次强 |
-| `anthropic.claude-opus-4-20250514-v1` | us | Opus 4 兼容别名 |
+| `claude-sonnet-4-6-us` | us | 最新 Sonnet，us 端点 |
+| `claude-sonnet-4-6-global` | global | 最新 Sonnet，global 端点 |
+| `claude-sonnet-4-6` | us | Sonnet 4.6 兼容别名 |
 | `claude-sonnet-4-5` | global | 平衡性能与成本 |
-| `anthropic.claude-sonnet-4-20250514-v1` | us | Sonnet 4 兼容别名 |
 | `claude-sonnet-3-7` | us | 性价比高 |
 | `claude-sonnet-3-5` | us | 快速响应 |
 | `claude-haiku-4-5` | global | 最快最便宜 |
-| `us.anthropic.claude-3-5-haiku-20241022-v1:0` | global | Haiku 3.5 兼容别名 |
 
 ---
 
@@ -43,7 +44,7 @@ curl -X POST https://litellm.example.com/v1/chat/completions \
   }'
 ```
 
-**注意**: `<YOUR_API_KEY>` 是从 DynamoDB 表中获取的 API Key (sk-xxx 格式)，使用 `./scripts/manage-keys.sh create` 创建。
+**注意**: `<YOUR_API_KEY>` 是通过 LiteLLM Admin UI (`/ui`) 创建的 API Key (sk-xxx 格式)。
 
 ### Streaming
 
@@ -310,6 +311,6 @@ curl https://litellm.example.com/health/readiness
 
 当主模型不可用时，自动降级到备选模型：
 
-- `claude-opus-4-6-us` -> `claude-opus-4-6-global` -> `claude-opus-4-5` -> `claude-sonnet-4-5`
+- `claude-opus-4-6-us` -> `claude-opus-4-6-global` -> `claude-opus-4-5` -> `claude-sonnet-4-6-us` -> `claude-sonnet-4-6-global` -> `claude-sonnet-4-5`
 - `claude-sonnet-4-5` -> `claude-sonnet-3-7` -> `claude-sonnet-3-5`
 - `claude-haiku-4-5` -> `claude-sonnet-3-5`

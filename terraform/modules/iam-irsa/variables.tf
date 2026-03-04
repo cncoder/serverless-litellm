@@ -35,8 +35,3 @@ variable "alb_controller_service_account" {
   type    = string
   default = "aws-load-balancer-controller"
 }
-
-variable "dynamodb_table_arn" {
-  description = "ARN of the DynamoDB table for LiteLLM API keys"
-  type        = string
-}

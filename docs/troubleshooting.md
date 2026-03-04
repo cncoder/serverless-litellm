@@ -24,7 +24,7 @@ kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controll
 kubectl describe ingress -n litellm
 ```
 
-常见原因：Pod Identity 绑定未生效（需等待 1-2 分钟），或 IAM 权限不足。
+常见原因：IRSA（IAM Roles for Service Accounts）绑定未生效（需等待 1-2 分钟），或 IAM 权限不足。
 
 ### 502 Bad Gateway
 
@@ -50,7 +50,7 @@ aws elbv2 describe-target-health --target-group-arn $TG_ARN
 # 查看 Bedrock 相关日志
 kubectl logs -n litellm -l app=litellm | grep -i bedrock
 
-# 检查 Pod Identity 绑定
+# 检查 IRSA 绑定
 kubectl describe sa litellm-sa -n litellm
 
 # 确认 Bedrock 模型已在目标区域开启
@@ -112,7 +112,7 @@ Master Key 存储在 AWS Secrets Manager，任何时候都可以找回：
 ```bash
 aws secretsmanager get-secret-value \
   --secret-id litellm-master-key-prod \
-  --region eu-central-1 \
+  --region us-west-2 \
   --query SecretString \
   --output text
 ```
@@ -124,16 +124,12 @@ aws secretsmanager get-secret-value \
 **完全删除所有资源**:
 
 ```bash
-# 先备份 DynamoDB 数据
-aws dynamodb scan --table-name litellm-api-keys-prod \
-  --output json > dynamodb-backup-$(date +%Y%m%d).json
-
 # 删除
 cd terraform
 terraform destroy
 ```
 
-**警告**: 此操作将删除 EKS 集群、DynamoDB 表（API Keys 数据）、VPC、ALB、ECR 等全部资源。
+**警告**: 此操作将删除 EKS 集群、RDS 数据库（API Keys 数据）、VPC、ALB、ECR 等全部资源。
 
 **仅删除 Kubernetes 资源**:
 

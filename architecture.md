@@ -1,6 +1,6 @@
 # LiteLLM on EKS Serverless 架构设计文档
 
-本文档详细说明 LiteLLM 在 AWS EKS Fargate 上的 Serverless 部署架构，使用 DynamoDB 作为认证存储，完全无需管理节点和数据库。
+本文档详细说明 LiteLLM 在 AWS EKS Fargate 上的部署架构，使用 RDS PostgreSQL 作为数据存储，Fargate 无需管理节点。
 
 ---
 
@@ -25,7 +25,7 @@ Application Load Balancer (共享, group.name="litellm")
         EKS Fargate (2 AZs)
         ┌─────────────────────────────────┐
         │  LiteLLM Pods (2-10 replicas)   │
-        │  - Pod Identity (原生)           │
+        │  - IRSA (IAM Roles for SA)       │
         │  - HPA 自动扩缩 (CPU 70%)        │
         │  - PDB 中断保护 (min 1)          │
         │  - Fargate 无服务器计算          │
@@ -34,9 +34,9 @@ Application Load Balancer (共享, group.name="litellm")
                  │
         ┌────────┼──────────┐
         ▼        ▼          ▼
-    Bedrock   DynamoDB   ECR
-    Claude    API Keys   Images
-    (us-west-2)  (按需)
+    Bedrock   RDS        ECR
+    Claude    PostgreSQL Images
+    (us-west-2)
 ```
 
 ### 架构层次说明
@@ -52,11 +52,11 @@ Application Load Balancer (共享, group.name="litellm")
 **计算层 (EKS Fargate)**:
 - LiteLLM Pod 运行在 Fargate 上，完全 Serverless
 - 无需管理节点、无需配置 Auto Scaling Group
-- 使用 Pod Identity 获取临时 AWS 凭证
+- 使用 IRSA 获取临时 AWS 凭证
 - 按 Pod 实际运行时间付费
 
 **数据层**:
-- **DynamoDB**: API Keys 和用户配置存储，按需计费
+- **RDS PostgreSQL**: API Keys、用户配置、预算等数据存储（LiteLLM 原生支持）
 - **ECR**: 容器镜像存储
 - **Bedrock**: 实际 LLM 推理服务
 
@@ -89,10 +89,10 @@ VPC (10.0.0.0/16)
 - 节省 $32+/月 的 NAT Gateway 固定成本
 - 避免数据传输费用 ($0.045/GB)
 
-**无数据库层的简化架构**:
-- DynamoDB 是托管服务，不需要在 VPC 内运行
-- 无需配置数据库子网和安全组
-- 通过 VPC Endpoint 或公网访问 DynamoDB
+**数据库层**:
+- RDS PostgreSQL 部署在 Private 子网内
+- 通过安全组限制仅允许 EKS Pod 访问
+- LiteLLM 原生支持 PostgreSQL 作为数据存储
 
 **子网标签的关键作用**:
 - `kubernetes.io/role/internal-elb=1`: 让 ALB Controller 在 Private 子网创建 ALB 目标组
@@ -101,7 +101,7 @@ VPC (10.0.0.0/16)
 
 ---
 
-## 3. 认证策略 (DynamoDB custom_auth)
+## 3. 认证策略 (LiteLLM Native Auth)
 
 ### 三 Ingress 共享 ALB 设计
 
@@ -156,64 +156,32 @@ alb.ingress.kubernetes.io/group.order: "50"
 
 ---
 
-### 3.1 DynamoDB 认证实现
+### 3.1 PostgreSQL 认证实现
 
-LiteLLM 使用 `custom_auth` 模式，API Keys 存储在 DynamoDB 表中。
+LiteLLM 使用原生 PostgreSQL 模式管理 API Keys，通过 Admin UI 创建和管理。
 
 **配置**:
 
 ```yaml
 general_settings:
   master_key: ${LITELLM_MASTER_KEY}
-  database_type: "custom"
-
-litellm_settings:
-  enable_custom_auth: true
-```
-
-**DynamoDB 表结构**:
-
-```
-表名: litellm-api-keys
-分区键: token (String) - API Key (sk-xxxxx)
-属性:
-  - user_id (String) - 用户标识
-  - created_at (Number) - 创建时间戳
-  - expires_at (Number, 可选) - 过期时间
-  - models (List, 可选) - 允许的模型列表
+  database_url: os.environ/DATABASE_URL
 ```
 
 **认证流程**:
 
 1. 请求携带 `Authorization: Bearer sk-xxxxx`
-2. LiteLLM 从 DynamoDB 查询 token
-3. 验证 token 有效性和权限
+2. LiteLLM 从 PostgreSQL 查询 token
+3. 验证 token 有效性和权限（支持预算、速率限制等）
 4. 转发请求到 Bedrock
-
-**成本对比**:
-
-| 方案 | 月成本 | 说明 |
-|------|--------|------|
-| Aurora Serverless v2 (0.5 ACU) | $43/月 | PostgreSQL 数据库 |
-| ElastiCache Redis (t3.micro) | $13/月 | 缓存层 |
-| DynamoDB 按需 | <$1/月 | 10万请求/天 |
-| **总计节省** | **$55/月** | 98% 成本降低 |
 
 **Key 管理**:
 
-```bash
-# 创建 Key
-./scripts/manage-keys.sh create user_001
-
-# 列出所有 Keys
-./scripts/manage-keys.sh list
-
-# 删除 Key
-./scripts/manage-keys.sh delete sk-xxxxx
-
-# 批量创建
-./scripts/manage-keys.sh batch-create users.txt
-```
+通过 LiteLLM Admin UI (`/ui`) 进行：
+- 创建/删除 API Key
+- 设置用户预算和速率限制
+- 查看使用统计
+- 管理团队和组织
 
 ---
 
@@ -363,95 +331,46 @@ resources:
 
 ---
 
-## 6. 数据层 (DynamoDB)
+## 6. 数据层 (RDS PostgreSQL)
 
-### DynamoDB 表配置
+### RDS 配置
 
 ```hcl
-table_name: "litellm-api-keys"
-billing_mode: "PAY_PER_REQUEST"  # 按需计费
-hash_key: "token"
-
-attribute {
-  name = "token"
-  type = "S"
-}
-
-attribute {
-  name = "user_id"
-  type = "S"
-}
-
-global_secondary_index {
-  name            = "UserIdIndex"
-  hash_key        = "user_id"
-  projection_type = "ALL"
-}
-
-ttl {
-  attribute_name = "expires_at"
-  enabled        = true
-}
+engine               = "postgres"
+engine_version       = "15"
+instance_class       = "db.t4g.micro"
+allocated_storage    = 20
+db_name              = "litellm"
+multi_az             = false          # 生产环境建议开启
+skip_final_snapshot  = false
+backup_retention     = 7              # 7 天自动备份
 ```
 
 ### 设计原因
 
-**为什么选择 DynamoDB?**
+**为什么选择 RDS PostgreSQL?**
 
-1. **Serverless 原生**:
-   - 完全托管，无需配置数据库实例
-   - 自动扩展，按实际请求量付费
-   - 与 Fargate 完美搭配，实现完全 Serverless 架构
+1. **LiteLLM 原生支持**:
+   - 设置 `DATABASE_URL` 即可启用完整功能
+   - 内置 API Key 管理、用户预算、速率限制、使用统计
+   - Admin UI (`/ui`) 提供图形化管理界面
+   - 无需自定义认证代码
 
-2. **成本优势**:
-   | 访问量 | DynamoDB 成本 | Aurora 成本 | 节省 |
-   |--------|--------------|-------------|------|
-   | 10万/天 | $0.75/月 | $43/月 | 98% |
-   | 100万/天 | $7.5/月 | $43/月 | 83% |
-   | 1000万/天 | $75/月 | $150/月 | 50% |
+2. **功能完整**:
+   - 支持团队和组织管理
+   - 支持 per-key 预算控制
+   - 支持使用量追踪和分析
+   - Schema 迁移由 LiteLLM 自动管理
 
-3. **性能稳定**:
-   - 单次查询延迟 < 10ms (P99)
-   - 无需连接池管理
-   - 无冷启动问题
+3. **数据持久化**:
+   - RDS 自动备份（7 天保留期）
+   - 支持手动快照
+   - 可选 Multi-AZ 高可用部署
 
-4. **按需计费模式**:
-   - 无需预配置读写容量
-   - 自动应对流量突发
-   - 适合不可预测的工作负载
-
-5. **TTL 自动清理**:
-   - 启用 TTL 功能自动删除过期 Key
-   - 无需定时任务清理
-   - 零维护成本
-
-6. **GSI 灵活查询**:
-   - UserIdIndex 支持按用户查询所有 Keys
-   - 无需复杂的 SQL JOIN
-   - 查询性能与主键一致
-
-**数据持久化**:
-- DynamoDB 自动跨 3 个 AZ 复制
-- 内置时间点恢复 (PITR)
-- 按需备份无额外成本
-
-**IAM 权限配置**:
-```json
-{
-  "Effect": "Allow",
-  "Action": [
-    "dynamodb:GetItem",
-    "dynamodb:PutItem",
-    "dynamodb:DeleteItem",
-    "dynamodb:Query",
-    "dynamodb:Scan"
-  ],
-  "Resource": [
-    "arn:aws:dynamodb:*:*:table/litellm-api-keys",
-    "arn:aws:dynamodb:*:*:table/litellm-api-keys/index/*"
-  ]
-}
-```
+4. **安全性**:
+   - 部署在 Private 子网，不暴露公网
+   - 安全组限制仅允许 EKS Pod 访问
+   - 传输加密 (TLS) + 静态加密 (KMS)
 
 ---
 
@@ -460,17 +379,13 @@ ttl {
 ### 身份认证和授权架构
 
 ```
-LiteLLM Pod Identity (EKS Pod Identity 替代 IRSA)
-    ├── 绑定 IAM Role: litellm-pod-role
+LiteLLM IRSA (IAM Roles for Service Accounts)
+    ├── 绑定 IAM Role: litellm-irsa-role
     │   └── 权限策略:
     │       ├── bedrock:InvokeModel (仅限 us-west-2 Claude 模型)
-    │       ├── bedrock:InvokeModelWithResponseStream
-    │       ├── dynamodb:GetItem (读取 API Keys)
-    │       ├── dynamodb:PutItem (创建 API Keys)
-    │       ├── dynamodb:Query (查询用户 Keys)
-    │       └── dynamodb:UpdateItem (更新 Key 元数据)
+    │       └── bedrock:InvokeModelWithResponseStream
     │
-    ├── ALB Controller Pod
+    ├── ALB Controller Pod (IRSA)
     │   └── IAM Role: alb-controller-role
     │       ├── elasticloadbalancing:* (创建/删除 ALB/TargetGroup)
     │       ├── ec2:DescribeSubnets (发现子网)
@@ -491,7 +406,7 @@ EKS Cluster Security Group (Private 层):
     - Port: 443 (Fargate Pod 端口)
     - Protocol: TCP
   Outbound:
-    - Destination: 0.0.0.0/0 (Fargate 自动路由到 VPC Endpoints 访问 Bedrock/ECR/DynamoDB)
+    - Destination: 0.0.0.0/0 (Fargate 自动路由到 VPC Endpoints 访问 Bedrock/ECR)
     - All ports, All protocols
 
 ALB Security Group (Public 层):
@@ -507,11 +422,11 @@ ALB Security Group (Public 层):
 
 ### 设计原因
 
-**EKS Pod Identity (新一代凭证机制)**:
-1. **取代 IRSA 的优势**:
-   - 无需手动配置 OIDC provider 和信任关系
-   - Pod 直接通过 EKS Cluster endpoint 获取凭证
-   - 简化 Terraform 代码 (减少 IAM policy document 复杂度)
+**IRSA (IAM Roles for Service Accounts)**:
+1. **通过 OIDC Provider 实现 Pod 级别权限**:
+   - EKS 集群创建 OIDC provider
+   - IAM Role 信任策略绑定到特定 ServiceAccount
+   - Pod 通过 `sts:AssumeRoleWithWebIdentity` 获取临时凭证
 
 2. **bedrock:InvokeModel* 权限的最小化**:
    ```json
@@ -530,22 +445,6 @@ ALB Security Group (Public 层):
    - 仅允许 Claude 系列模型，拒绝其他模型 (如 Titan, Llama)
    - 仅限 us-west-2 区域 (避免跨区调用导致额外费用)
    - 不包含管理权限 (如 CreateModelCustomizationJob)
-
-3. **DynamoDB 权限的资源级限制**:
-   ```json
-   {
-     "Effect": "Allow",
-     "Action": [
-       "dynamodb:GetItem",
-       "dynamodb:PutItem",
-       "dynamodb:Query",
-       "dynamodb:UpdateItem"
-     ],
-     "Resource": "arn:aws:dynamodb:us-west-2:123456789012:table/litellm-api-keys"
-   }
-   ```
-   - Pod 只能访问 API Keys 表
-   - 无法访问其他 DynamoDB 表或执行扫描操作
 
 **ALB Controller 独立 IAM 角色**:
 - 分离控制平面 (ALB Controller) 和数据平面 (LiteLLM Pod) 权限
@@ -572,22 +471,22 @@ rate_based_statement {
 **安全组设计的"最小化信任边界"**:
 - Fargate Pod 仅允许 ALB 入站流量（443 端口）
 - ALB 只开放 443 端口，禁用 80 (强制 HTTPS)
-- 无需 Database 层安全组（DynamoDB 通过 IAM 权限控制访问）
+- RDS 安全组限制仅允许 EKS Pod 入站访问（5432 端口）
 
 **数据存储的安全策略**:
-1. **DynamoDB 表级加密**:
-   - 默认使用 AWS 托管 KMS 密钥加密
-   - 静态数据自动加密
-   - 传输中数据通过 TLS 加密
-2. **K8s Secrets**: 存储非敏感配置 (如模型列表、DynamoDB 表名)
+1. **RDS 加密**:
+   - 静态加密使用 AWS 托管 KMS 密钥
+   - 传输加密通过 TLS
+   - 部署在 Private 子网，不暴露公网
+2. **K8s Secrets**: 存储敏感配置 (DATABASE_URL、LITELLM_MASTER_KEY)
    - base64 编码 (非加密，仅混淆)
    - etcd 加密可选开启 (EKS 支持 KMS 加密 etcd)
 
 **避免的反模式**:
-- ❌ 在 ConfigMap 或 Secrets 存储实际 API keys（应存在 DynamoDB）
+- ❌ 在 ConfigMap 存储数据库密码（应放在 Secret 中）
 - ❌ 给 LiteLLM Pod 赋予 `bedrock:*` 全量权限
-- ❌ DynamoDB 表开启公网访问（应限制为 VPC Endpoint 访问）
-- ❌ 使用 `dynamodb:Scan` 权限（性能差且成本高，用 Query 代替）
+- ❌ RDS 开启公网访问（应限制在 Private 子网）
+- ❌ 使用硬编码密码（应使用 Secrets Manager 或 K8s Secret）
 
 ---
 
@@ -618,9 +517,9 @@ terraform/
     │   ├── Outputs: fargate_profile_id, fargate_profile_status
     │   └── 依赖: eks (cluster_name), vpc (private_subnets), iam (fargate_profile_role_arn)
     │
-    ├── 5. dynamodb (API Key 存储层)
-    │   ├── Outputs: table_name, table_arn
-    │   └── 依赖: 无
+    ├── 5. rds (数据库层)
+    │   ├── Outputs: db_endpoint, db_name
+    │   └── 依赖: vpc (private_subnets)
     │
     ├── 6. ecr (镜像仓库层)
     │   ├── Outputs: repository_url
@@ -636,7 +535,7 @@ terraform/
     │
     └── 9. post-deploy (应用部署层)
         ├── 使用 local-exec 和 kubectl apply 部署 K8s manifests
-        └── 依赖: eks (kubeconfig), dynamodb (table_name)
+        └── 依赖: eks (kubeconfig), rds (db_endpoint)
 ```
 
 ### 各模块职责详解
@@ -666,10 +565,10 @@ terraform/
    - 信任关系: `eks-fargate-pods.amazonaws.com`
    - 用途: Fargate 拉取镜像、配置网络
 
-3. **LiteLLM Pod Role**:
-   - 自定义策略: Bedrock InvokeModel + DynamoDB GetItem/PutItem/Query/UpdateItem
-   - 信任关系: EKS Pod Identity 服务
-   - 用途: LiteLLM Pod 调用 Bedrock 和访问 DynamoDB API Keys
+3. **LiteLLM Pod Role (IRSA)**:
+   - 自定义策略: Bedrock InvokeModel
+   - 信任关系: EKS OIDC provider (sts:AssumeRoleWithWebIdentity)
+   - 用途: LiteLLM Pod 调用 Bedrock 推理服务
 
 4. **ALB Controller Role**:
    - 自定义策略: elasticloadbalancing:*, ec2:Describe*, wafv2:Associate*
@@ -683,12 +582,11 @@ terraform/
 **3. EKS 模块** (`modules/eks`)
 - 创建 EKS Cluster (Kubernetes 1.31)
 - 仅控制平面，无 Managed Node Group（使用 Fargate）
-- 5 个 EKS 插件:
+- 4 个 EKS 插件:
   1. `vpc-cni`: Pod 网络 (使用 ENI)
   2. `kube-proxy`: Service 网络转发
   3. `coredns`: DNS 解析（配置为在 Fargate 上运行）
   4. `aws-ebs-csi-driver`: EBS 存储卷（可选，Fargate 支持 EBS）
-  5. `eks-pod-identity-agent`: Pod Identity 凭证分发
 
 **为什么独立模块**: EKS 集群是核心计算资源，生命周期独立；与 Fargate Profile 分离管理便于独立更新集群版本。
 
@@ -706,14 +604,15 @@ terraform/
 
 ---
 
-**5. DynamoDB 模块** (`modules/dynamodb`)
-- 表名: `litellm-api-keys`
-- 分区键: `token` (String)
-- 计费模式: PAY_PER_REQUEST (按需付费)
-- TTL 属性: `expires_at` (自动清理过期 Keys)
+**5. RDS 模块** (`modules/rds`)
+- 引擎: PostgreSQL 15
+- 实例类型: db.t4g.micro (可调整)
+- 存储: 20GB gp3
+- 自动备份: 7 天保留期
 - 加密: 使用 AWS 托管 KMS 密钥
+- 子网组: Private 子网
 
-**为什么独立模块**: DynamoDB 表是有状态资源，变更风险低但需谨慎；独立管理便于调整 TTL 设置和备份策略；支持跨环境复用 (dev/prod 使用不同表名)。
+**为什么独立模块**: RDS 是有状态资源，变更风险高需谨慎；独立管理便于调整实例类型和备份策略；支持跨环境复用 (dev/prod 使用不同实例)。
 
 ---
 
@@ -773,7 +672,7 @@ kubectl apply -f /tmp/hpa.yaml
 
 **为什么独立模块**:
 1. **Terraform 管理 AWS 资源，kubectl 管理 K8s 资源**: 职责分离，避免 Terraform 状态文件混入 K8s 资源
-2. **依赖所有其他模块**: 需要 DynamoDB 表名、ECR URL 等变量
+2. **依赖所有其他模块**: 需要 RDS 连接信息、ECR URL 等变量
 3. **幂等性保证**: `kubectl apply` 是幂等操作，重复执行不会出错
 4. **便于调试**: local-exec 输出可见，方便排查 K8s 部署失败原因
 
@@ -807,15 +706,16 @@ module "fargate_profile" {
   fargate_profile_role_arn = module.iam.fargate_profile_role_arn
 }
 
-module "dynamodb" {
-  source          = "./modules/dynamodb"
-  table_name      = "litellm-api-keys"
+module "rds" {
+  source          = "./modules/rds"
+  vpc_id          = module.vpc.vpc_id
+  private_subnets = module.vpc.private_subnets
 }
 
 module "post_deploy" {
   source          = "./modules/post-deploy"
   cluster_endpoint = module.eks.cluster_endpoint
-  dynamodb_table_name = module.dynamodb.table_name
+  db_endpoint     = module.rds.db_endpoint
   ecr_repository_url = module.ecr.repository_url
 }
 ```
@@ -849,18 +749,18 @@ Prometheus (Helm Chart，需配置在 Fargate)
     ├── 采集指标:
     │   ├── LiteLLM: /metrics 端点 (请求延迟, 降级次数, token 使用量)
     │   ├── Fargate Pod: CPU, Memory (通过 Kubernetes Metrics Server)
-    │   └── DynamoDB: 读写容量单位、限流次数 (通过 CloudWatch Metrics)
+    │   └── RDS: CPU、连接数、查询延迟 (通过 CloudWatch Metrics)
     │
     └── 告警规则:
         ├── Pod CPU > 90% 持续 5 分钟
-        ├── DynamoDB 读限流次数 > 10/min
+        ├── RDS CPU > 80% 持续 5 分钟
         └── Fargate Pod 启动时间 > 2 分钟
 ```
 
 ### 成本优化建议
 
 1. **Fargate Spot**: 使用 Fargate Spot 可节省 ~70% Fargate 计算成本，适合可容忍中断的工作负载
-2. **DynamoDB 按需计费优化**: 监控实际读写模式，如 QPS 稳定可切换到预置容量模式节省 ~40%
+2. **RDS 实例选型优化**: 根据实际连接数和查询负载选择合适实例类型，测试环境可用 db.t4g.micro 节省成本
 3. **Single AZ 部署 (仅测试环境)**: 减少到单 AZ 可降低数据传输成本
 4. **ECR 镜像清理**: 启用生命周期策略，保留最新 10 个镜像，自动删除旧镜像节省存储成本
 
@@ -872,8 +772,8 @@ Prometheus (Helm Chart，需配置在 Fargate)
 |---------|------|------------|-----|
 | 单个 LiteLLM Pod 崩溃 | 无 (HPA 维持 minReplicas=2) | Fargate 自动重启 Pod | <1min |
 | Fargate 计算节点故障 | Pod 迁移到新 Fargate 节点 | K8s 自动重新调度 | <2min |
-| DynamoDB 服务故障 | API Key 认证失败 | AWS 自动多 AZ 容灾 | <1min |
-| DynamoDB 读写限流 | 请求延迟增加 | 自动启用突发容量或切换预置模式 | <30s |
+| RDS PostgreSQL 故障 | API Key 认证失败 | Multi-AZ 自动故障切换 | <1min |
+| RDS 连接数耗尽 | 新请求排队等待 | 连接池自动回收 + HPA 扩容分散负载 | <30s |
 | Bedrock Opus 4.6 US 区域故障 | 自动降级到 Opus 4.6 Global | LiteLLM 路由器降级 | <1s |
 | ECR 服务故障 | 新 Pod 无法启动（已有 Pod 不受影响） | 等待 ECR 恢复或使用镜像缓存 | <5min |
 | ALB 故障 | 全部流量中断 | AWS 自动替换不健康 target | <1min |
@@ -882,13 +782,13 @@ Prometheus (Helm Chart，需配置在 Fargate)
 
 ## 总结
 
-本架构采用 AWS 全托管 Serverless 服务 (EKS Fargate, DynamoDB, Bedrock), 实现高可用、零运维、极致成本优化的 LiteLLM 生产部署。
+本架构采用 AWS 托管服务 (EKS Fargate, RDS PostgreSQL, Bedrock), 实现高可用、低运维、成本优化的 LiteLLM 生产部署。
 
 核心设计原则:
-1. **安全优先**: IAM 最小权限, VPC 隔离, 无硬编码凭证, DynamoDB 加密存储
-2. **零运维**: Fargate 全托管计算, DynamoDB 全托管存储, 无需管理节点或数据库
-3. **弹性伸缩**: HPA 自动扩 Pod, Fargate 按需分配资源, DynamoDB 自动扩容
-4. **高可用**: 多 AZ 部署, PDB 保护, 降级链路, Fargate/DynamoDB 内置容灾
-5. **成本极致优化**: 纯 Serverless 架构, 按需付费无固定成本, 相比传统架构节省 ~60%
+1. **安全优先**: IAM 最小权限, VPC 隔离, 无硬编码凭证, RDS 加密存储
+2. **低运维**: Fargate 全托管计算, RDS 托管数据库, 无需管理节点
+3. **弹性伸缩**: HPA 自动扩 Pod, Fargate 按需分配资源
+4. **高可用**: 多 AZ 部署, PDB 保护, 降级链路, RDS Multi-AZ 容灾
+5. **成本优化**: Fargate Serverless 计算 + RDS 按需实例, 相比传统架构节省 ~50%
 
-适用场景: 中小规模 LLM API 代理服务 (< 1000 QPS), 追求极致成本优化和零运维。如需更高并发, 建议增加 HPA maxReplicas 和 DynamoDB 预置容量模式。
+适用场景: 中小规模 LLM API 代理服务 (< 1000 QPS), 追求低运维和成本优化。如需更高并发, 建议增加 HPA maxReplicas 和 RDS 实例规格。

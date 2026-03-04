@@ -35,8 +35,5 @@ Thumbs.db
 # Logs
 *.log
 
-# Scripts output
-dynamodb-backup-*.json
-
 # Test results (may contain sensitive data)
 test-results/

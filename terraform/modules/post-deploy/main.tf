@@ -13,7 +13,6 @@ resource "null_resource" "build_push_image" {
 
   triggers = {
     dockerfile_hash = filemd5("${path.root}/../docker/Dockerfile")
-    auth_hash       = filemd5("${path.root}/../docker/custom_auth.py")
   }
 
   provisioner "local-exec" {
@@ -62,7 +61,6 @@ metadata:
 type: Opaque
 stringData:
   LITELLM_MASTER_KEY: "${var.litellm_master_key}"
-  DYNAMODB_API_KEYS_TABLE: "${var.dynamodb_table_name}"
   AWS_REGION: "${var.aws_region}"
   DATABASE_URL: "${var.database_url}"
 EOSECRET

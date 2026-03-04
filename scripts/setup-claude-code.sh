@@ -50,17 +50,7 @@ fi
 # 如果未提供 Key，自动创建
 if [[ -z "$API_KEY" ]]; then
     info "自动创建 API Key..."
-    if [[ -f "scripts/manage-keys.sh" ]]; then
-        # 非交互模式创建（直接调用 DynamoDB）
-        read -rp "User ID (如 claude-code): " USER_ID
-        USER_ID="${USER_ID:-claude-code}"
-        API_KEY=$(./scripts/manage-keys.sh add "$USER_ID" 2>/dev/null | grep -oE 'sk-[a-zA-Z0-9-]+' | tail -1)
-        if [[ -z "$API_KEY" ]]; then
-            error "自动创建失败，请先运行 ./scripts/manage-keys.sh add <user_id> 获取 API Key"
-        fi
-    else
-        error "请提供 API Key: ./scripts/setup-claude-code.sh --key <sk-xxx>"
-    fi
+    error "请先通过 LiteLLM Admin UI (/ui) 创建 API Key，然后运行: ./scripts/setup-claude-code.sh --key <sk-xxx>"
 fi
 
 ANTHROPIC_BASE_URL="${LITELLM_HOST}/anthropic"

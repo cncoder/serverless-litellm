@@ -72,7 +72,6 @@ module "iam_irsa" {
   oidc_provider_url              = replace(module.eks.oidc_issuer_url, "https://", "")
   litellm_namespace              = var.litellm_namespace
   litellm_service_account        = var.litellm_service_account
-  dynamodb_table_arn             = module.dynamodb.table_arn
 
   depends_on = [aws_iam_openid_connect_provider.eks]
 }
@@ -84,14 +83,7 @@ module "ecr" {
   environment  = var.environment
 }
 
-# DynamoDB Module
-module "dynamodb" {
-  source       = "./modules/dynamodb"
-  project_name = var.project_name
-  environment  = var.environment
-}
-
-# RDS PostgreSQL Module（LiteLLM Admin UI + 使用量统计）
+# RDS PostgreSQL Module（LiteLLM API Key 认证 + Admin UI + 使用量统计）
 module "rds" {
   source = "./modules/rds"
 
@@ -171,7 +163,6 @@ module "post_deploy" {
   aws_region              = var.aws_region
   litellm_master_key      = aws_secretsmanager_secret_version.litellm_master_key.secret_string
   ecr_repository_url      = module.ecr.repository_url
-  dynamodb_table_name     = module.dynamodb.table_name
   litellm_pod_role_arn    = module.iam_irsa.litellm_pod_role_arn
   database_url            = module.rds.database_url
   acm_certificate_arn     = var.acm_certificate_arn
@@ -186,7 +177,6 @@ module "post_deploy" {
   depends_on = [
     module.eks,
     module.iam_irsa,
-    module.dynamodb,
     module.ecr,
     module.alb_controller,
     module.rds,

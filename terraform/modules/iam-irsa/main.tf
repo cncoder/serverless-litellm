@@ -47,26 +47,6 @@ resource "aws_iam_role_policy" "litellm_bedrock" {
   })
 }
 
-resource "aws_iam_role_policy" "litellm_dynamodb" {
-  name = "${var.project_name}-${var.environment}-litellm-dynamodb-policy"
-  role = aws_iam_role.litellm_pod.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:Query",
-          "dynamodb:BatchGetItem"
-        ]
-        Resource = var.dynamodb_table_arn
-      }
-    ]
-  })
-}
-
 # ALB Controller Role (IRSA - IAM Roles for Service Accounts, Fargate compatible)
 resource "aws_iam_role" "alb_controller" {
   name = "${var.project_name}-${var.environment}-alb-controller-role"

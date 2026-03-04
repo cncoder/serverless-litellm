@@ -13,11 +13,6 @@ output "eks_cluster_endpoint" {
   value       = module.eks.cluster_endpoint
 }
 
-output "dynamodb_table_name" {
-  description = "DynamoDB API keys table name"
-  value       = module.dynamodb.table_name
-}
-
 output "ecr_repository_url" {
   description = "ECR repository URL"
   value       = module.ecr.repository_url

@@ -16,11 +16,6 @@ variable "ecr_repository_url" {
   type        = string
 }
 
-variable "dynamodb_table_name" {
-  description = "DynamoDB API keys table name"
-  type        = string
-}
-
 variable "acm_certificate_arn" {
   type = string
 }

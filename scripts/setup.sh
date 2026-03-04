@@ -510,7 +510,7 @@ ${BOLD}Domain Configuration:${NC}
 ${BOLD}Infrastructure:${NC}
   EKS Version:           1.31
   Compute:               AWS Fargate (serverless)
-  Storage:               DynamoDB (API keys)
+  Storage:               RDS PostgreSQL (API keys + Admin UI + usage stats)
 
 ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}
 EOF
@@ -760,13 +760,12 @@ display_deployment_info() {
     log_step "Deployment Complete!"
 
     # Extract Terraform outputs
-    local cluster_name eks_endpoint dynamodb_table ecr_url master_key alb_hostname vpc_id
+    local cluster_name eks_endpoint ecr_url master_key alb_hostname vpc_id
 
     cd "$TERRAFORM_DIR" || exit 1
 
     cluster_name=$(terraform output -raw eks_cluster_name 2>/dev/null || echo "N/A")
     eks_endpoint=$(terraform output -raw eks_cluster_endpoint 2>/dev/null || echo "N/A")
-    dynamodb_table=$(terraform output -raw dynamodb_table_name 2>/dev/null || echo "N/A")
     ecr_url=$(terraform output -raw ecr_repository_url 2>/dev/null || echo "N/A")
     master_key=$(terraform output -raw litellm_master_key 2>/dev/null || echo "N/A")
     vpc_id=$(terraform output -raw vpc_id 2>/dev/null || echo "N/A")
@@ -788,7 +787,6 @@ ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━�
   EKS Cluster:           ${cluster_name}
   Cluster Endpoint:      ${eks_endpoint}
   ECR Repository:        ${ecr_url}
-  DynamoDB Table:        ${dynamodb_table}
 
 ${BOLD}Access Credentials:${NC}
 ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}
@@ -863,9 +861,8 @@ EOF
          "messages": [{"role": "user", "content": "Hello!"}]
        }'
 
-  ${GREEN}5.${NC} Create additional API keys:
-     cd ${SCRIPT_DIR}
-     ./manage-keys.sh create user@example.com
+  ${GREEN}5.${NC} Create API keys via LiteLLM Admin UI:
+     Open ${proto}://${LITELLM_HOST}/ui (use Master Key to login)
 
   ${GREEN}6.${NC} Monitor your deployment:
      kubectl get pods -n litellm

@@ -2,16 +2,21 @@
 
 ## 可用模型列表
 
-| 别名 | Bedrock Model ID | 区域类型 |
-|------|-----------------|---------|
-| `claude-opus-4-6-us` | `us.anthropic.claude-opus-4-6-v1` | us |
-| `claude-opus-4-6-global` | `global.anthropic.claude-opus-4-6-v1` | global |
-| `claude-opus-4-5` | `global.anthropic.claude-opus-4-5-20251101-v1:0` | global |
-| `claude-sonnet-4-5` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | global |
-| `claude-sonnet-3-7` | `us.anthropic.claude-3-7-sonnet-20250219-v1:0` | us |
-| `claude-sonnet-3-5` | `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | us |
-| `claude-haiku-4-5` | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | global |
-| `bedrock/*` | 任意 Bedrock 模型 ID | 通配符（直接透传）|
+| 模型名 | Bedrock Model ID | 区域类型 | 备注 |
+|--------|-----------------|---------|------|
+| `claude-opus-4-6-us` | `us.anthropic.claude-opus-4-6-v1` | us | |
+| `claude-opus-4-6-global` | `global.anthropic.claude-opus-4-6-v1` | global | |
+| `claude-opus-4-5` | `global.anthropic.claude-opus-4-5-20251101-v1:0` | global | |
+| `claude-sonnet-4-6-us` | `us.anthropic.claude-sonnet-4-6` | us | |
+| `claude-sonnet-4-6-global` | `global.anthropic.claude-sonnet-4-6` | global | |
+| `claude-opus-4-6` | `us.anthropic.claude-opus-4-6-v1` | us | Claude Code 默认别名 |
+| `claude-sonnet-4-6` | `us.anthropic.claude-sonnet-4-6` | us | Claude Code 默认别名 |
+| `claude-haiku-4-5-20251001` | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | global | Claude Code 默认别名 |
+| `claude-sonnet-4-5` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | global | |
+| `claude-sonnet-3-7` | `us.anthropic.claude-3-7-sonnet-20250219-v1:0` | us | |
+| `claude-sonnet-3-5` | `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | us | |
+| `claude-haiku-4-5` | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | global | |
+| `bedrock/*` | 任意 Bedrock 模型 ID | 通配符（直接透传）| |
 
 **区域类型说明**:
 - **us** - Cross-Region Inference 端点，us-west-2 和 us-east-1 自动负载均衡
@@ -25,7 +30,11 @@
 claude-opus-4-6-us
   └─失败(3次)→ claude-opus-4-6-global
                 └─失败(3次)→ claude-opus-4-5
-                              └─失败(3次)→ claude-sonnet-4-5
+                              └─失败(3次)→ claude-sonnet-4-6-us
+                                            └─失败(3次)→ claude-sonnet-4-6-global
+                                                          └─失败(3次)→ claude-sonnet-4-5
+                                                                        └─失败(3次)→ claude-sonnet-3-7
+                                                                                      └─失败(3次)→ claude-sonnet-3-5 (兜底)
 
 claude-haiku-4-5
   └─失败(3次)→ claude-sonnet-3-5 (兜底)

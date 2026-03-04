@@ -4,11 +4,11 @@
 
 ## 特性
 
-- **9 个 Bedrock Claude 模型** - Opus 4.6/4.5, Sonnet 4.5/3.7/3.5, Haiku 4.5，支持通配符路由 `bedrock/*`
+- **Bedrock Claude 全系列** - Opus 4.6/4.5, Sonnet 4.6/4.5/3.7/3.5, Haiku 4.5，支持通配符路由 `bedrock/*`
 - **完整降级链** - 自动 Fallback，3 次失败后切换备用模型
-- **零静态凭证** - EKS Pod Identity，无需管理 AWS Access Key
+- **零静态凭证** - EKS IRSA（IAM Roles for Service Accounts），无需管理 AWS Access Key
 - **Serverless 计算** - EKS Fargate，按需付费无需管理节点
-- **DynamoDB API Keys** - custom_auth 认证，脚本管理
+- **RDS PostgreSQL** - API Key 管理 + Admin UI + 使用量统计，一站式存储
 - **可选安全增强** - WAF 速率限制 + Cognito 用户认证
 
 ## 架构
@@ -22,9 +22,9 @@ Internet → ALB (HTTPS + TLS 1.3 + WAF optional)
                 │
                 └── other hosts → 403 Forbidden
                         │
-               ┌────────┴────────┐
-          LiteLLM Pods (2-10)    DynamoDB
-          EKS Fargate            API Keys
+               ┌────────┴────────────────┐
+          LiteLLM Pods (2-10)      RDS PostgreSQL
+          EKS Fargate              API Keys/Admin UI/Stats
                │
         ┌──────┴──────┐
     Bedrock          Bedrock
@@ -54,20 +54,11 @@ cd serverless-litellm
 
 ## 创建 API Key
 
-部署完成后，为用户创建 API Key：
+部署完成后，通过 LiteLLM Admin UI 管理 API Key：
 
-```bash
-# 创建 API Key
-./scripts/manage-keys.sh add <user_id>
-
-# 带预算限制
-./scripts/manage-keys.sh add <user_id> --budget 100
-
-# 查看所有 Key
-./scripts/manage-keys.sh list
-```
-
-创建完成后会输出形如 `sk-<user_id>-xxxxxxxxxxxx` 的 API Key，**妥善保管，不会再次显示**。
+1. 访问 `https://<YOUR_LITELLM_DOMAIN>/ui`
+2. 使用 Master Key 登录
+3. 在 Keys 页面创建、查看、删除 API Key
 
 ## 配置 Claude Code
 
@@ -114,11 +105,10 @@ claude --model claude-haiku-4-5      # Haiku 快速
 
 ```
 .
-├── terraform/          # 基础设施（EKS, VPC, DynamoDB, ECR, WAF）
+├── terraform/          # 基础设施（EKS, VPC, RDS, ECR, WAF）
 ├── kubernetes/         # K8s 资源（Deployment, Service, Ingress, HPA）
 ├── scripts/
 │   ├── setup.sh                # 一键部署
-│   ├── manage-keys.sh          # API Key 管理
 │   └── setup-claude-code.sh    # Claude Code 配置
 └── docs/               # 详细文档
 ```

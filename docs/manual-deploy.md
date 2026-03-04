@@ -27,7 +27,7 @@ vim terraform.tfvars
 ```hcl
 project_name = "litellm"
 environment  = "prod"
-aws_region   = "eu-central-1"
+aws_region   = "us-west-2"
 
 # 域名
 litellm_host = "litellm.example.com"
@@ -70,7 +70,7 @@ terraform apply
 
 ```hcl
 # terraform.tfvars
-acm_certificate_arn = "arn:aws:acm:eu-central-1:123456789012:certificate/xxx"
+acm_certificate_arn = "arn:aws:acm:us-west-2:123456789012:certificate/xxx"
 ```
 
 ```bash
@@ -93,7 +93,6 @@ terraform apply
 
 Terraform 输出内容：
 - `eks_cluster_name` - EKS 集群名
-- `dynamodb_table_name` - DynamoDB 表名
 - `litellm_master_key` - Master Key（敏感，使用 `-raw` 参数获取）
 - `ecr_repository_url` - ECR 仓库地址
 - `kubeconfig_command` - 配置 kubectl 的命令
@@ -103,7 +102,7 @@ Terraform 输出内容：
 ## Step 4: 配置 kubectl
 
 ```bash
-aws eks update-kubeconfig --name litellm-eks-prod --region eu-central-1
+aws eks update-kubeconfig --name litellm-eks-prod --region us-west-2
 ```
 
 ---
