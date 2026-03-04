@@ -249,6 +249,34 @@ curl -N https://litellm.example.com/v1/chat/completions \
 
 ---
 
+## 远程桌面访问（NICE DCV）
+
+OpenClaw 的部分配置需要 GUI 操作（如 Discord OAuth 授权、浏览器登录、Dashboard 管理）。在 headless EC2 上，推荐使用 [NICE DCV](https://aws.amazon.com/hpc/dcv/) 提供远程桌面：
+
+```bash
+# Amazon Linux 2023
+sudo yum install -y nice-dcv-server nice-dcv-web-viewer
+sudo systemctl enable --now dcvserver
+
+# 创建 DCV session
+dcv create-session --type virtual openclaw-session
+
+# 从本地连接（浏览器或 DCV Client）
+# https://<ec2-public-ip>:8443
+```
+
+**适用场景**：
+- 首次初始化 OpenClaw（`openclaw setup` 交互式配置）
+- 配置消息渠道（Discord Bot Token、Telegram Webhook 等需要浏览器操作）
+- 访问 LiteLLM Admin UI（`https://<alb>/ui`）
+- 调试 OpenClaw Dashboard（`http://127.0.0.1:18789`）
+
+> **安全提示**：DCV 默认监听 8443 端口，安全组仅开放给你的 IP（`/32`），不要用 `0.0.0.0/0`。
+
+参考：[AWS NICE DCV 远程桌面搭建指南](https://aws.amazon.com/jp/builders-flash/202407/nice-dcv-content-creation/)
+
+---
+
 ## 安全建议
 
 - **API Key 轮换**：通过 LiteLLM Admin UI 为每个 OpenClaw 实例创建独立 Key，泄露时可单独撤销
