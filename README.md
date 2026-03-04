@@ -17,46 +17,48 @@ Bedrock 管模型和推理，LiteLLM 管人和成本。
 ## 架构
 
 ```mermaid
-graph TB
-    subgraph 客户端
-        CC[Claude Code]
-        OC[OpenClaw]
-        APP[自研应用 / Cursor]
+flowchart LR
+    subgraph Clients["客户端"]
+        direction TB
+        CC["🖥 Claude Code"]
+        OC["🤖 OpenClaw"]
+        App["📱 自研应用"]
     end
 
-    subgraph AWS
-        ALB[ALB<br/>HTTPS + WAF 可选]
-
-        subgraph 鉴权分流
-            API["/v1/* API 请求<br/>API Key 认证"]
-            UI["/ui Admin UI<br/>Cognito 认证"]
-        end
-
-        subgraph EKS Fargate
-            LLM[LiteLLM Pods<br/>2-10 replicas<br/>IRSA 零静态凭证]
-        end
-
-        RDS[(RDS PostgreSQL<br/>Key 管理 / 用量统计)]
-
-        subgraph Amazon Bedrock
-            R1[us-west-2]
-            R2[us-east-1]
-            R3[跨 Region 负载均衡]
-        end
+    subgraph Gateway["AWS — 网关层"]
+        ALB["⚡ ALB\nHTTPS · WAF"]
+        Auth{"鉴权分流"}
+        APIKey["/v1/*\nAPI Key"]
+        Cognito["/ui\nCognito"]
     end
 
-    CC & OC & APP --> ALB
-    ALB --> API & UI
-    API & UI --> LLM
-    LLM --> RDS
-    LLM --> R1 & R2
-    R1 & R2 -.-> R3
+    subgraph Compute["AWS — 计算层"]
+        LLM["LiteLLM\nEKS Fargate\n2-10 pods · IRSA"]
+    end
 
-    style ALB fill:#ff9900,color:#fff
-    style LLM fill:#527fff,color:#fff
-    style RDS fill:#3b48cc,color:#fff
-    style R1 fill:#232f3e,color:#fff
-    style R2 fill:#232f3e,color:#fff
+    subgraph Storage["AWS — 存储"]
+        RDS[("RDS\nPostgreSQL")]
+    end
+
+    subgraph Bedrock["Amazon Bedrock"]
+        direction TB
+        West["us-west-2"]
+        East["us-east-1"]
+    end
+
+    Clients --> ALB
+    ALB --> Auth
+    Auth --> APIKey & Cognito
+    APIKey & Cognito --> LLM
+    LLM <--> RDS
+    LLM --> West & East
+
+    style ALB fill:#ff9900,stroke:#ff9900,color:#fff
+    style LLM fill:#146eb4,stroke:#146eb4,color:#fff
+    style RDS fill:#3b48cc,stroke:#3b48cc,color:#fff
+    style West fill:#232f3e,stroke:#232f3e,color:#fff
+    style East fill:#232f3e,stroke:#232f3e,color:#fff
+    style Auth fill:#fff,stroke:#ff9900,color:#333
 ```
 
 ## 特性
