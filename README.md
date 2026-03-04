@@ -1,20 +1,18 @@
 # LiteLLM on EKS — 基于 Bedrock 的企业级 AI 网关
 
-> 在 AWS EKS Fargate 上部署 LiteLLM，充分利用 Bedrock 的模型服务能力，补齐企业多团队管控层
+一键在 AWS 上部署 LiteLLM 代理，让团队通过统一 API Key 使用 Bedrock Claude 全系列模型。开箱即用对接 Claude Code 和 OpenClaw。
 
-## Bedrock + LiteLLM = ？
+## 为什么需要这个？
 
-**Bedrock 管模型和推理，LiteLLM 管人和成本。**
-
-Bedrock 已经提供了无服务器推理、跨 Region 负载均衡（Cross-Region Inference Profile）、IAM 鉴权和数据驻留。但企业多团队使用时，还需要：
+Bedrock 已经提供了无服务器推理、跨 Region 负载均衡和 IAM 鉴权。但企业多团队使用时，还需要：
 
 - **per-user API Key** — 每人独立配额，离职即撤销，不暴露 AWS 凭证
-- **实时用量仪表盘** — 按人 / 团队 / 模型 / 项目维度拆账，不用等月底 CUR
+- **实时用量仪表盘** — 按人 / 团队 / 模型维度拆账，不用等月底 CUR
 - **自动 Fallback** — Opus 超时切 Sonnet 切 Haiku，跨模型容灾
 - **双 API 格式** — OpenAI + Anthropic 格式同时支持，Claude Code / Cursor / OpenClaw 零改造接入
 - **per-key 限速限额** — 防止单人打爆 Bedrock 配额
 
-LiteLLM 作为应用层网关，补齐这些能力。开发者只需一个 API Key，无需配置 AWS 环境。
+Bedrock 管模型和推理，LiteLLM 管人和成本。
 
 ## 架构
 
