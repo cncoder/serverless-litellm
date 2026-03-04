@@ -99,9 +99,10 @@ resource "aws_db_instance" "main" {
   backup_window           = "03:00-04:00"
   maintenance_window      = "sun:04:00-sun:05:00"
 
-  # 删除保护（生产环境开启）
-  deletion_protection = false  # 允许 terraform destroy 清理
-  skip_final_snapshot = true
+  # 删除保护（生产环境默认开启）
+  deletion_protection       = var.deletion_protection
+  skip_final_snapshot       = var.skip_final_snapshot
+  final_snapshot_identifier = var.skip_final_snapshot ? null : "${var.project_name}-postgres-final-${var.environment}"
 
   # 性能优化
   performance_insights_enabled = false  # t4g.micro 不支持

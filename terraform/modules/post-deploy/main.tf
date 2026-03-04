@@ -51,27 +51,18 @@ resource "null_resource" "deploy_litellm" {
       export LITELLM_POD_ROLE_ARN="${var.litellm_pod_role_arn}"
       envsubst < ${path.root}/../kubernetes/serviceaccount.yaml | kubectl apply -f -
 
-      # Create K8s secret
-      cat > /tmp/litellm-secret.yaml <<EOSECRET
-apiVersion: v1
-kind: Secret
-metadata:
-  name: litellm-secrets
-  namespace: litellm
-type: Opaque
-stringData:
-  LITELLM_MASTER_KEY: "${var.litellm_master_key}"
-  AWS_REGION: "${var.aws_region}"
-  DATABASE_URL: "${var.database_url}"
-EOSECRET
-      kubectl apply -f /tmp/litellm-secret.yaml
-      rm /tmp/litellm-secret.yaml
+      # Delete legacy K8s Secret if it exists (secrets now injected via Init Container from Secrets Manager)
+      kubectl delete secret litellm-secrets -n litellm --ignore-not-found
 
       # Apply ConfigMap
       kubectl apply -f ${path.root}/../kubernetes/configmap.yaml
 
-      # Apply deployment with ECR image substitution
+      # Apply deployment with ECR image + Secrets Manager substitution
       export ECR_REPOSITORY_URL="${var.ecr_repository_url}"
+      export MASTER_KEY_SECRET_ID="${var.master_key_secret_id}"
+      export DB_PASSWORD_SECRET_ID="${var.db_password_secret_id}"
+      export DATABASE_URL_BASE="${var.database_url_base}"
+      export AWS_REGION_VAL="${var.aws_region}"
       envsubst < ${path.root}/../kubernetes/deployment.yaml | kubectl apply -f -
 
       # Apply service

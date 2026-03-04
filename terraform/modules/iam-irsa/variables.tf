@@ -35,3 +35,9 @@ variable "alb_controller_service_account" {
   type    = string
   default = "aws-load-balancer-controller"
 }
+
+variable "secrets_arns" {
+  description = "List of Secrets Manager ARNs that LiteLLM pods can read"
+  type        = list(string)
+  default     = []
+}

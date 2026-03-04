@@ -1,5 +1,6 @@
 # ====================================================================
 # LiteLLM Deployment - 核心应用部署配置
+# Secrets 通过 Init Container 从 AWS Secrets Manager 注入（非 K8s Secret）
 # ====================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -30,9 +31,61 @@ spec:
       # 使用 IRSA（IAM Roles for Service Accounts）服务账户
       serviceAccountName: litellm-sa
 
+      # Init Container: 从 Secrets Manager 拉取 secrets 写入 emptyDir
+      initContainers:
+      - name: secrets-init
+        image: amazon/aws-cli:latest
+        command:
+          - sh
+          - -c
+          - |
+            set -e
+            # Fetch Master Key from Secrets Manager
+            MASTER_KEY=$(aws secretsmanager get-secret-value \
+              --secret-id "$MASTER_KEY_SECRET_ID" \
+              --region "$AWS_REGION" \
+              --query SecretString --output text)
+
+            # Fetch DB Password from Secrets Manager
+            DB_PASSWORD=$(aws secretsmanager get-secret-value \
+              --secret-id "$DB_PASSWORD_SECRET_ID" \
+              --region "$AWS_REGION" \
+              --query SecretString --output text)
+
+            # Construct DATABASE_URL by replacing placeholder
+            DATABASE_URL=$(echo "$DATABASE_URL_BASE" | sed "s|__DB_PASSWORD__|${DB_PASSWORD}|g")
+
+            # Write env file for main container
+            cat > /secrets/.env <<EOF
+            export LITELLM_MASTER_KEY="${MASTER_KEY}"
+            export DATABASE_URL="${DATABASE_URL}"
+            export AWS_REGION="${AWS_REGION}"
+            EOF
+
+            echo "Secrets successfully fetched from Secrets Manager"
+        env:
+        - name: MASTER_KEY_SECRET_ID
+          value: "$MASTER_KEY_SECRET_ID"
+        - name: DB_PASSWORD_SECRET_ID
+          value: "$DB_PASSWORD_SECRET_ID"
+        - name: DATABASE_URL_BASE
+          value: "$DATABASE_URL_BASE"
+        - name: AWS_REGION
+          value: "$AWS_REGION_VAL"
+        volumeMounts:
+        - name: secrets-volume
+          mountPath: /secrets
+        resources:
+          requests:
+            cpu: "256m"
+            memory: "256Mi"
+          limits:
+            cpu: "256m"
+            memory: "256Mi"
+
       containers:
       - name: litellm
-        image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/litellm-prod:latest
+        image: $ECR_REPOSITORY_URL:latest
         imagePullPolicy: Always
 
         # 容器端口
@@ -41,30 +94,22 @@ spec:
           containerPort: 4000
           protocol: TCP
 
-        # 启动参数
-        args:
-          - "--config"
-          - "/app/config.yaml"
-          - "--detailed_debug"
-
-        # 环境变量 - 从 Secret 注入
-        envFrom:
-        - secretRef:
-            name: litellm-secrets
-
-        # 额外的环境变量配置
-        env:
-        - name: AWS_REGION
-          valueFrom:
-            secretKeyRef:
-              name: litellm-secrets
-              key: AWS_REGION
+        # 启动命令: source secrets 然后启动 litellm
+        command:
+          - sh
+          - -c
+          - |
+            . /secrets/.env
+            exec litellm --config /app/config.yaml --detailed_debug
 
         # 配置文件挂载
         volumeMounts:
         - name: config
           mountPath: /app/config.yaml
           subPath: config.yaml
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /secrets
           readOnly: true
 
         # 资源限制 (Fargate: requests = limits)
@@ -96,8 +141,12 @@ spec:
           timeoutSeconds: 5
           failureThreshold: 3
 
-      # 配置文件卷
+      # 卷定义
       volumes:
       - name: config
         configMap:
           name: litellm-config
+      - name: secrets-volume
+        emptyDir:
+          medium: Memory           # tmpfs，secrets 不落盘
+          sizeLimit: 1Mi

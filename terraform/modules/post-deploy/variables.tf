@@ -6,9 +6,19 @@ variable "aws_region" {
   type = string
 }
 
-variable "litellm_master_key" {
-  type      = string
-  sensitive = true
+variable "master_key_secret_id" {
+  description = "Secrets Manager secret ID for LiteLLM Master Key"
+  type        = string
+}
+
+variable "db_password_secret_id" {
+  description = "Secrets Manager secret ID for RDS DB password"
+  type        = string
+}
+
+variable "database_url_base" {
+  description = "PostgreSQL connection URL with __DB_PASSWORD__ placeholder"
+  type        = string
 }
 
 variable "ecr_repository_url" {
@@ -59,8 +69,3 @@ variable "litellm_pod_role_arn" {
   type        = string
 }
 
-variable "database_url" {
-  description = "PostgreSQL DATABASE_URL for LiteLLM Admin UI"
-  type        = string
-  sensitive   = true
-}

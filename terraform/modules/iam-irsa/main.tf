@@ -47,6 +47,24 @@ resource "aws_iam_role_policy" "litellm_bedrock" {
   })
 }
 
+# Secrets Manager access for LiteLLM pods (Master Key + DB Password)
+resource "aws_iam_role_policy" "litellm_secrets" {
+  count = length(var.secrets_arns) > 0 ? 1 : 0
+  name  = "${var.project_name}-${var.environment}-litellm-secrets-policy"
+  role  = aws_iam_role.litellm_pod.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = var.secrets_arns
+      }
+    ]
+  })
+}
+
 # ALB Controller Role (IRSA - IAM Roles for Service Accounts, Fargate compatible)
 resource "aws_iam_role" "alb_controller" {
   name = "${var.project_name}-${var.environment}-alb-controller-role"

@@ -13,3 +13,19 @@ output "db_identifier" {
   description = "RDS instance identifier"
   value       = aws_db_instance.main.identifier
 }
+
+output "db_password_secret_arn" {
+  description = "ARN of the Secrets Manager secret containing the DB password"
+  value       = aws_secretsmanager_secret.db_password.arn
+}
+
+output "db_password_secret_id" {
+  description = "ID (name) of the Secrets Manager secret containing the DB password"
+  value       = aws_secretsmanager_secret.db_password.id
+}
+
+output "database_url_base" {
+  description = "PostgreSQL connection URL without password (for Init Container to construct)"
+  value       = "postgresql://${aws_db_instance.main.username}:__DB_PASSWORD__@${aws_db_instance.main.endpoint}/${aws_db_instance.main.db_name}"
+  sensitive   = false
+}

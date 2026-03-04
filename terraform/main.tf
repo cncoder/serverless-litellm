@@ -72,6 +72,10 @@ module "iam_irsa" {
   oidc_provider_url              = replace(module.eks.oidc_issuer_url, "https://", "")
   litellm_namespace              = var.litellm_namespace
   litellm_service_account        = var.litellm_service_account
+  secrets_arns = [
+    aws_secretsmanager_secret.litellm_master_key.arn,
+    module.rds.db_password_secret_arn,
+  ]
 
   depends_on = [aws_iam_openid_connect_provider.eks]
 }
@@ -161,10 +165,11 @@ module "post_deploy" {
 
   cluster_name            = local.cluster_name
   aws_region              = var.aws_region
-  litellm_master_key      = aws_secretsmanager_secret_version.litellm_master_key.secret_string
+  master_key_secret_id    = aws_secretsmanager_secret.litellm_master_key.id
+  db_password_secret_id   = module.rds.db_password_secret_id
+  database_url_base       = module.rds.database_url_base
   ecr_repository_url      = module.ecr.repository_url
   litellm_pod_role_arn    = module.iam_irsa.litellm_pod_role_arn
-  database_url            = module.rds.database_url
   acm_certificate_arn     = var.acm_certificate_arn
   enable_cognito          = var.enable_cognito
   cognito_user_pool_arn       = var.cognito_user_pool_arn
