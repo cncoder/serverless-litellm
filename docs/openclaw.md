@@ -249,31 +249,68 @@ curl -N https://litellm.example.com/v1/chat/completions \
 
 ---
 
-## 远程桌面访问（NICE DCV）
+## 远程桌面访问（Amazon DCV）
 
-OpenClaw 的部分配置需要 GUI 操作（如 Discord OAuth 授权、浏览器登录、Dashboard 管理）。在 headless EC2 上，推荐使用 [NICE DCV](https://aws.amazon.com/hpc/dcv/) 提供远程桌面：
+OpenClaw 的部分操作需要 GUI 环境（浏览器登录、OAuth 授权、Dashboard 调试等）。在 headless EC2 上，推荐使用 [Amazon DCV](https://aws.amazon.com/hpc/dcv/) 提供低延迟远程桌面。
+
+### 为什么用 Amazon DCV？
+
+| 对比 | VNC / RDP | Amazon DCV |
+|------|-----------|------------|
+| 延迟 | 明显卡顿 | GPU 硬件加速，流畅操作浏览器 |
+| 协议 | 带宽消耗大 | 自适应 QUIC/WebSocket，弱网也流畅 |
+| 许可费 | RDP 需 CAL | **EC2 上免费**（无需额外 license） |
+| 安全 | 需自行配置加密 | TLS 1.3 + 证书自动管理 |
+| 客户端 | 装专用软件 | **浏览器直连** `https://<ip>:8443` |
+
+### 安装（Amazon Linux 2023）
 
 ```bash
-# Amazon Linux 2023
+# 1. 安装桌面环境（headless EC2 默认无 GUI）
+sudo yum groupinstall -y "MATE Desktop Environment"
+
+# 2. 安装 Amazon DCV
+sudo rpm --import https://d1uj6qtbmh3dt5.cloudfront.net/NICE-GPG-KEY
 sudo yum install -y nice-dcv-server nice-dcv-web-viewer
+
+# 3. 启动服务
 sudo systemctl enable --now dcvserver
 
-# 创建 DCV session
-dcv create-session --type virtual openclaw-session
+# 4. 设置登录密码（DCV 用系统用户认证）
+sudo passwd ec2-user
 
-# 从本地连接（浏览器或 DCV Client）
-# https://<ec2-public-ip>:8443
+# 5. 创建虚拟 session
+dcv create-session --type virtual --owner ec2-user openclaw-session
 ```
 
-**适用场景**：
-- 首次初始化 OpenClaw（`openclaw setup` 交互式配置）
-- 配置消息渠道（Discord Bot Token、Telegram Webhook 等需要浏览器操作）
-- 访问 LiteLLM Admin UI（`https://<alb>/ui`）
+### 连接
+
+打开浏览器访问 `https://<ec2-public-ip>:8443`，用 ec2-user 账号密码登录。
+
+也可以下载 [DCV Client](https://docs.aws.amazon.com/dcv/latest/userguide/client.html) 获得更好体验（支持 USB 重定向、多显示器等）。
+
+### 适用场景
+
+- 首次初始化 OpenClaw（`openclaw setup` 交互式配置、Discord Bot Token 设置）
+- 浏览器登录授权（Discord OAuth、GitHub OAuth 等回调流程）
+- 访问 LiteLLM Admin UI（`https://<alb>/ui`）管理 Key 和查看用量
 - 调试 OpenClaw Dashboard（`http://127.0.0.1:18789`）
 
-> **安全提示**：DCV 默认监听 8443 端口，安全组仅开放给你的 IP（`/32`），不要用 `0.0.0.0/0`。
+### 安全配置
 
-参考：[AWS NICE DCV 远程桌面搭建指南](https://aws.amazon.com/jp/builders-flash/202407/nice-dcv-content-creation/)
+```bash
+# 安全组只开放 DCV 端口给你的 IP（绝不用 0.0.0.0/0）
+aws ec2 authorize-security-group-ingress \
+  --group-id <your-sg-id> \
+  --protocol tcp --port 8443 \
+  --cidr <your-ip>/32
+```
+
+> **提示**：用完后可以 `dcv close-session openclaw-session` 关闭 session，或直接 `sudo systemctl stop dcvserver` 停止服务，减少攻击面。
+
+参考文档：
+- [Amazon DCV 管理指南](https://docs.aws.amazon.com/dcv/latest/adminguide/setting-up.html) — 官方安装与配置
+- [Amazon DCV 产品页](https://aws.amazon.com/hpc/dcv/) — 功能介绍与定价
 
 ---
 
