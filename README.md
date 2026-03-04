@@ -1,5 +1,7 @@
 # LiteLLM on EKS — 基于 Bedrock 的企业级 AI 网关
 
+[🇺🇸 English](README.en.md)
+
 一键在 AWS 上部署 LiteLLM 代理，让团队通过统一 API Key 使用 Bedrock Claude 全系列模型。开箱即用对接 Claude Code 和 OpenClaw。
 
 ## 为什么需要 LiteLLM？
