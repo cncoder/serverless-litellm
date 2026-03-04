@@ -16,39 +16,47 @@ Bedrock 管模型和推理，LiteLLM 管人和成本。
 
 ## 架构
 
-```
-                    ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-                    │ Claude Code │  │  OpenClaw    │  │  自研应用   │
-                    └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
-                           │                │                │
-                           └────────────────┼────────────────┘
-                                            │
-                                   ┌────────▼────────┐
-                                   │   ALB (HTTPS)   │
-                                   │  + WAF 可选     │
-                                   └───────┬─────────┘
-                                           │
-                              ┌────────────┼────────────┐
-                              │                         │
-                     ┌────────▼────────┐       ┌───────▼────────┐
-                     │  /v1/* API 请求  │       │  /ui Admin UI  │
-                     │  (API Key 认证)  │       │ (Cognito 认证) │
-                     └────────┬────────┘       └───────┬────────┘
-                              │                        │
-                     ┌────────▼────────────────────────▼────────┐
-                     │         LiteLLM Pods (2-10 replicas)     │
-                     │              EKS Fargate                 │
-                     │          IRSA — 零静态凭证                │
-                     └──────┬──────────────────┬────────────────┘
-                            │                  │
-                   ┌────────▼────────┐  ┌──────▼───────┐
-                   │  Amazon Bedrock │  │     RDS      │
-                   │  Claude 全系列   │  │  PostgreSQL  │
-                   │                 │  │  Key / 用量   │
-                   │  us-west-2      │  └──────────────┘
-                   │  us-east-1      │
-                   │  (跨 Region)    │
-                   └─────────────────┘
+```mermaid
+graph TB
+    subgraph 客户端
+        CC[Claude Code]
+        OC[OpenClaw]
+        APP[自研应用 / Cursor]
+    end
+
+    subgraph AWS
+        ALB[ALB<br/>HTTPS + WAF 可选]
+
+        subgraph 鉴权分流
+            API["/v1/* API 请求<br/>API Key 认证"]
+            UI["/ui Admin UI<br/>Cognito 认证"]
+        end
+
+        subgraph EKS Fargate
+            LLM[LiteLLM Pods<br/>2-10 replicas<br/>IRSA 零静态凭证]
+        end
+
+        RDS[(RDS PostgreSQL<br/>Key 管理 / 用量统计)]
+
+        subgraph Amazon Bedrock
+            R1[us-west-2]
+            R2[us-east-1]
+            R3[跨 Region 负载均衡]
+        end
+    end
+
+    CC & OC & APP --> ALB
+    ALB --> API & UI
+    API & UI --> LLM
+    LLM --> RDS
+    LLM --> R1 & R2
+    R1 & R2 -.-> R3
+
+    style ALB fill:#ff9900,color:#fff
+    style LLM fill:#527fff,color:#fff
+    style RDS fill:#3b48cc,color:#fff
+    style R1 fill:#232f3e,color:#fff
+    style R2 fill:#232f3e,color:#fff
 ```
 
 ## 特性
