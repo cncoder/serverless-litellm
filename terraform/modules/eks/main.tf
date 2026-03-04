@@ -1,5 +1,18 @@
 data "aws_caller_identity" "current" {}
 
+locals {
+  caller_arn = data.aws_caller_identity.current.arn
+  # Convert STS assumed-role ARN to IAM role ARN for EKS access entries
+  # STS format: arn:aws:sts::ACCOUNT:assumed-role/ROLE_NAME/SESSION_NAME
+  # IAM format: arn:aws:iam::ACCOUNT:role/ROLE_NAME
+  is_assumed_role = length(regexall("assumed-role", local.caller_arn)) > 0
+  iam_role_arn = local.is_assumed_role ? format(
+    "arn:aws:iam::%s:role/%s",
+    data.aws_caller_identity.current.account_id,
+    element(split("/", local.caller_arn), 1)
+  ) : local.caller_arn
+}
+
 resource "aws_eks_cluster" "main" {
   name     = var.cluster_name
   role_arn = var.cluster_role_arn
@@ -27,13 +40,13 @@ resource "aws_eks_cluster" "main" {
 # Grant the Terraform executor (current IAM identity) cluster admin access
 resource "aws_eks_access_entry" "terraform_executor" {
   cluster_name  = aws_eks_cluster.main.name
-  principal_arn = data.aws_caller_identity.current.arn
+  principal_arn = local.iam_role_arn
   type          = "STANDARD"
 }
 
 resource "aws_eks_access_policy_association" "terraform_executor_admin" {
   cluster_name  = aws_eks_cluster.main.name
-  principal_arn = data.aws_caller_identity.current.arn
+  principal_arn = local.iam_role_arn
   policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
   access_scope {
