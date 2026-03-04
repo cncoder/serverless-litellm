@@ -91,6 +91,28 @@ claude --model claude-haiku-4-5      # Haiku 快速
 
 > 详细说明见 [docs/claude-code.md](docs/claude-code.md)
 
+## 配置 OpenClaw
+
+[OpenClaw](https://github.com/openclaw/openclaw) 是开源 AI 助手框架，支持 Discord/Telegram/Slack 等平台。通过 LiteLLM 接入 Bedrock：
+
+```json
+// ~/.openclaw/openclaw.json
+{
+  "ai": {
+    "provider": "litellm",
+    "model": "claude-sonnet-4-6",
+    "baseUrl": "https://<YOUR_LITELLM_DOMAIN>",
+    "apiKey": "<YOUR_LITELLM_KEY>"
+  }
+}
+```
+
+```bash
+openclaw gateway start
+```
+
+> 详细说明见 [docs/openclaw.md](docs/openclaw.md)
+
 ## 文档
 
 | 文档 | 说明 |
@@ -98,6 +120,7 @@ claude --model claude-haiku-4-5      # Haiku 快速
 | [docs/manual-deploy.md](docs/manual-deploy.md) | 手动部署步骤（Terraform 变量、两阶段 ACM 部署） |
 | [docs/models.md](docs/models.md) | 可用模型列表、Fallback 链、路由策略 |
 | [docs/claude-code.md](docs/claude-code.md) | Claude Code 配置、1M context、模型选择 |
+| [docs/openclaw.md](docs/openclaw.md) | OpenClaw AI 助手框架集成指南 |
 | [docs/API_USAGE.md](docs/API_USAGE.md) | OpenAI SDK / Anthropic SDK / cURL 调用示例 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 常见问题、调试命令、清理资源 |
 
