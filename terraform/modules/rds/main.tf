@@ -68,6 +68,40 @@ resource "aws_secretsmanager_secret_version" "db_password" {
   }
 }
 
+# Custom Parameter Group（避免使用 AWS 默认参数组）
+resource "aws_db_parameter_group" "main" {
+  name        = "${var.project_name}-pg-${var.environment}"
+  family      = "postgres16"
+  description = "Custom parameter group for LiteLLM PostgreSQL"
+
+  parameter {
+    name  = "log_connections"
+    value = "1"
+  }
+
+  parameter {
+    name  = "log_disconnections"
+    value = "1"
+  }
+
+  parameter {
+    name  = "log_statement"
+    value = "ddl"
+  }
+
+  parameter {
+    name         = "shared_preload_libraries"
+    value        = "pg_stat_statements"
+    apply_method = "pending-reboot"
+  }
+
+  tags = {
+    Name        = "${var.project_name}-pg-${var.environment}"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
 # RDS PostgreSQL t4g.micro（单 AZ，无多活，成本最优）
 resource "aws_db_instance" "main" {
   identifier = "${var.project_name}-postgres-${var.environment}"
@@ -103,6 +137,9 @@ resource "aws_db_instance" "main" {
   deletion_protection       = var.deletion_protection
   skip_final_snapshot       = var.skip_final_snapshot
   final_snapshot_identifier = var.skip_final_snapshot ? null : "${var.project_name}-postgres-final-${var.environment}"
+
+  # 自定义参数组
+  parameter_group_name = aws_db_parameter_group.main.name
 
   # 性能优化
   performance_insights_enabled = false  # t4g.micro 不支持
