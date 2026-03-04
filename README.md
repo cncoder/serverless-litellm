@@ -21,7 +21,12 @@ Bedrock 管模型和推理，LiteLLM 管人和成本。
                 │
         ALB (HTTPS + WAF 可选)
                 │
-       ┌────────┴─────────┐
+        ┌───────┼───────────┐
+        │       │           │
+   /v1/* API  /ui Admin   Cognito
+   (API Key)  (Cognito)   用户池
+        │       │
+       ┌┴───────┴────┐
   LiteLLM Pods (2-10)   RDS PostgreSQL
   EKS Fargate            Key 管理 / 用量统计
        │
@@ -38,7 +43,7 @@ us-west-2  us-east-1
 - **零静态凭证** — EKS IRSA（IAM Roles for Service Accounts），无需管理 AWS Access Key
 - **Serverless 计算** — EKS Fargate，按需付费无需管理节点
 - **RDS PostgreSQL** — API Key 管理 + Admin UI + 使用量统计
-- **可选安全增强** — WAF 速率限制 + Cognito 用户认证
+- **可选安全增强** — WAF 速率限制 + Cognito 用户认证（Admin UI / Dashboard 等非 API 接口通过 Cognito 登录保护，API 接口走 API Key 认证，两套鉴权互不干扰）
 
 ## 前置条件
 
