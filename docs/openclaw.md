@@ -283,6 +283,7 @@ dcv create-session --type virtual openclaw-session
 - **网络隔离**：将 OpenClaw 和 LiteLLM 部署在同一 VPC，使用内部 ALB 通信
 - **预算限制**：在 LiteLLM 设置 per-key 消费上限，防止成本失控
 - **审计追踪**：LiteLLM 记录所有请求的模型、token 数、成本和 Key 元数据
+- **Skill 安全审查**：安装第三方 OpenClaw Skill 前，建议使用 [skill-vetter](https://clawhub.ai/spclaudehome/skill-vetter) 进行安全审查（检查权限、网络请求、数据访问等）。⚠️ 审查结果仅供参考，不能替代人工复核——建议对关键 Skill 仍然手动检查源码
 
 ---
 
