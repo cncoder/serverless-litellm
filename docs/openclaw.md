@@ -1,73 +1,93 @@
-# OpenClaw Configuration Guide
+# OpenClaw 配置指南
 
-Use [OpenClaw](https://github.com/openclaw/openclaw) with LiteLLM as the AI backend, routing all requests through AWS Bedrock — no Anthropic API key required.
-
----
-
-## What is OpenClaw?
-
-OpenClaw is an open-source AI assistant framework that runs as a persistent daemon, connecting to messaging platforms (Discord, Telegram, Slack, etc.) and providing tool-use capabilities (file I/O, shell commands, browser automation, cron jobs, and more).
-
-By default, OpenClaw connects directly to AI providers (Anthropic, OpenAI, etc.). With this LiteLLM integration, all AI requests route through your self-hosted LiteLLM proxy to AWS Bedrock — giving you:
-
-- **No Anthropic API key needed** — use your existing AWS Bedrock access
-- **Centralized usage tracking** — all token usage logged in LiteLLM's PostgreSQL database
-- **Multi-model routing** — switch between Opus, Sonnet, Haiku via LiteLLM config
-- **Automatic failover** — LiteLLM's fallback chains handle model unavailability
-- **Cost control** — set per-key budgets and rate limits in LiteLLM Admin UI
+通过 [OpenClaw](https://github.com/openclaw/openclaw) 连接 LiteLLM，所有 AI 请求经由 AWS Bedrock 路由 — 无需 Anthropic API Key。
 
 ---
 
-## Prerequisites
+## OpenClaw 是什么？
 
-- A running LiteLLM deployment (see [main README](../README.md))
-- Your LiteLLM endpoint URL (e.g., `https://litellm.example.com`)
-- A LiteLLM API key (Master Key or a key created via Admin UI)
-- OpenClaw installed ([installation guide](https://docs.openclaw.ai))
+OpenClaw 是一个开源 AI 助手框架，作为常驻守护进程运行，可连接 Discord、Telegram、Slack 等消息平台，提供文件操作、Shell 命令、浏览器自动化、定时任务等工具能力。
+
+默认情况下 OpenClaw 直连 AI 服务商（Anthropic、OpenAI 等）。通过本指南的 LiteLLM 集成，所有 AI 请求将路由至你自建的 LiteLLM 代理 → AWS Bedrock：
+
+- **无需 Anthropic API Key** — 直接使用 AWS Bedrock 访问权限
+- **集中化用量追踪** — 所有 token 用量记录在 LiteLLM PostgreSQL 数据库
+- **多模型路由** — 通过 LiteLLM 配置在 Opus、Sonnet、Haiku 间切换
+- **自动故障转移** — LiteLLM fallback chain 自动处理模型不可用
+- **成本控制** — 在 LiteLLM Admin UI 设置 per-key 预算和限流
 
 ---
 
-## Quick Start
+## 前置条件
 
-### 1. Install OpenClaw
+- 已部署的 LiteLLM 实例（参见 [主 README](../README.md)）
+- LiteLLM 端点 URL（如 `https://litellm.example.com`）
+- LiteLLM API Key（Master Key 或通过 Admin UI 创建的 Key）
+- 已安装 OpenClaw（[安装指南](https://docs.openclaw.ai)）
+
+---
+
+## 快速开始
+
+### 1. 安装 OpenClaw
 
 ```bash
-# npm (Node.js 20+)
+# npm（需要 Node.js 20+）
 npm install -g openclaw
 
-# Verify
+# 验证
 openclaw --version
 ```
 
-### 2. Initialize workspace
+### 2. 配置 LiteLLM 作为 AI 后端
 
-```bash
-openclaw init
-```
-
-### 3. Configure LiteLLM as AI provider
-
-Edit your OpenClaw config file (`~/.openclaw/openclaw.json`):
+编辑 `~/.openclaw/openclaw.json`：
 
 ```json
 {
-  "ai": {
-    "provider": "litellm",
-    "model": "claude-sonnet-4-6",
-    "baseUrl": "https://litellm.example.com",
-    "apiKey": "sk-your-litellm-key"
+  "models": {
+    "providers": {
+      "litellm": {
+        "baseUrl": "https://litellm.example.com/v1",
+        "apiKey": "<your-litellm-key>",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "claude-sonnet-4-6",
+            "name": "Claude Sonnet 4.6",
+            "contextWindow": 200000,
+            "maxTokens": 16384
+          },
+          {
+            "id": "claude-opus-4-6",
+            "name": "Claude Opus 4.6",
+            "contextWindow": 200000,
+            "maxTokens": 16384
+          },
+          {
+            "id": "claude-haiku-4-5",
+            "name": "Claude Haiku 4.5",
+            "contextWindow": 200000,
+            "maxTokens": 16384
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "litellm/claude-sonnet-4-6"
+    }
+  },
+  "gateway": {
+    "mode": "local"
   }
 }
 ```
 
-Or use environment variables:
+> **注意**：`baseUrl` 必须包含 `/v1` 后缀。模型引用格式为 `litellm/<model-id>`，其中 `litellm` 是 provider 名称。
 
-```bash
-export LITELLM_API_BASE="https://litellm.example.com"
-export LITELLM_API_KEY="sk-your-litellm-key"
-```
-
-### 4. Start the gateway
+### 3. 启动 Gateway
 
 ```bash
 openclaw gateway start
@@ -75,99 +95,65 @@ openclaw gateway start
 
 ---
 
-## Configuration Reference
+## 可用模型
 
-### Minimal config (`openclaw.json`)
+使用 LiteLLM 配置中定义的任意模型别名：
 
-```json
-{
-  "ai": {
-    "provider": "litellm",
-    "model": "claude-sonnet-4-6",
-    "baseUrl": "https://litellm.example.com",
-    "apiKey": "sk-your-litellm-key"
-  }
-}
-```
+| 模型 | 适用场景 | 成本 |
+|------|----------|------|
+| `claude-opus-4-6` | 复杂推理、编码、深度分析 | $$$ |
+| `claude-sonnet-4-6` | 通用任务，速度与质量均衡 | $$ |
+| `claude-haiku-4-5` | 快速响应，简单任务 | $ |
+| `claude-sonnet-4-5` | 上一代 Sonnet | $$ |
 
-### Full config with model override and fallback
-
-```json
-{
-  "ai": {
-    "provider": "litellm",
-    "model": "claude-sonnet-4-6",
-    "baseUrl": "https://litellm.example.com",
-    "apiKey": "sk-your-litellm-key"
-  }
-}
-```
-
-### Available models
-
-Use any model alias defined in your LiteLLM config:
-
-| Model | Best For | Cost |
-|-------|----------|------|
-| `claude-opus-4-6` | Complex reasoning, coding, analysis | $$$ |
-| `claude-sonnet-4-6` | General tasks, balanced speed/quality | $$ |
-| `claude-haiku-4-5` | Fast responses, simple tasks | $ |
-| `claude-sonnet-4-5` | Previous generation Sonnet | $$ |
-
-Switch models at runtime:
+运行时切换模型：
 
 ```bash
-# Via OpenClaw CLI
-openclaw config set ai.model claude-opus-4-6
-
-# Or use /model command in chat
-/model claude-opus-4-6
+# 或在聊天中使用命令
+/model litellm/claude-opus-4-6
 ```
 
 ---
 
-## How It Works
+## 工作原理
 
 ```
-User (Discord/Telegram/CLI)
+用户 (Discord / Telegram / CLI)
     │
     ▼
 OpenClaw Gateway
     │
-    ▼ (OpenAI-compatible API)
-LiteLLM Proxy (https://litellm.example.com)
-    │
-    ├─ /v1/chat/completions  (streaming)
-    ├─ /v1/models            (model listing)
+    ▼  OpenAI 兼容 API（/v1/chat/completions）
+LiteLLM Proxy
     │
     ▼
-AWS Bedrock (Claude models)
+AWS Bedrock (Claude 模型)
 ```
 
-OpenClaw uses the OpenAI-compatible chat completions API (`/v1/chat/completions`), which LiteLLM natively supports. LiteLLM translates these requests to the appropriate Bedrock API format.
+OpenClaw 使用 OpenAI 兼容的 Chat Completions API，LiteLLM 原生支持并自动翻译为 Bedrock API 格式。
 
-Key behaviors:
-- **Streaming**: OpenClaw streams responses by default — LiteLLM handles SSE streaming correctly
-- **Tool use**: OpenClaw's tool-calling features work through LiteLLM without modification
-- **Token tracking**: All usage is logged by LiteLLM and visible in the Admin UI
-- **Thinking/extended thinking**: Supported when using compatible models (Opus, Sonnet)
+关键行为：
+- **流式响应**：OpenClaw 默认使用 SSE 流式传输，LiteLLM 完整支持
+- **工具调用**：OpenClaw 的 tool-use 功能通过 LiteLLM 无需修改即可工作
+- **Token 追踪**：所有用量由 LiteLLM 记录，可在 Admin UI 查看
+- **思考模式**：兼容模型（Opus、Sonnet）支持 extended thinking
 
 ---
 
-## Verify the Integration
+## 验证集成
 
-### 1. Check LiteLLM health
+### 1. 检查 LiteLLM 健康状态
 
 ```bash
 curl -s https://litellm.example.com/health/liveliness
-# Expected: "I'm alive!"
+# 预期: "I'm alive!"
 ```
 
-### 2. Test API connectivity
+### 2. 测试 API 连通性
 
 ```bash
 curl -s https://litellm.example.com/v1/chat/completions \
-  -H "Authorization: Bearer sk-your-litellm-key" \
+  -H "Authorization: Bearer <your-litellm-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-6",
@@ -176,113 +162,106 @@ curl -s https://litellm.example.com/v1/chat/completions \
   }'
 ```
 
-### 3. Test through OpenClaw
+### 3. 通过 OpenClaw 测试
 
 ```bash
-# Start gateway and send a test message
-openclaw gateway start
-# Send a message through your connected channel (Discord, Telegram, etc.)
-# Or use the CLI: openclaw chat "Hello, world!"
+openclaw agent --agent main --message "What is 2+2?"
+# 预期输出: 4
 ```
 
-### 4. Check token usage in LiteLLM
+### 4. 查看 Token 用量
 
-Visit `https://litellm.example.com/ui` → Login with Master Key → View usage dashboard.
+访问 `https://litellm.example.com/ui` → 用 Master Key 登录 → Usage 面板。
 
 ---
 
-## Deploy OpenClaw on EC2 with LiteLLM
-
-For a complete cloud setup, deploy OpenClaw on an EC2 instance alongside your LiteLLM cluster:
+## 在 EC2 上部署 OpenClaw + LiteLLM
 
 ```bash
-# On an EC2 instance (Amazon Linux 2023 / Ubuntu 22.04)
+# 在 EC2 实例上（Amazon Linux 2023 / Ubuntu 22.04）
 
-# 1. Install Node.js
+# 1. 安装 Node.js
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh"
 nvm install 22 && nvm use 22
 
-# 2. Install OpenClaw
+# 2. 安装 OpenClaw
 npm install -g openclaw
 
-# 3. Initialize
-openclaw init
-
-# 4. Configure LiteLLM backend
+# 3. 写入配置（替换 <your-alb> 和 <your-key>）
+mkdir -p ~/.openclaw
 cat > ~/.openclaw/openclaw.json << 'EOF'
 {
-  "ai": {
-    "provider": "litellm",
-    "model": "claude-sonnet-4-6",
-    "baseUrl": "https://litellm.example.com",
-    "apiKey": "sk-your-litellm-key"
-  }
+  "models": {
+    "providers": {
+      "litellm": {
+        "baseUrl": "http://<your-alb>/v1",
+        "apiKey": "<your-litellm-key>",
+        "api": "openai-completions",
+        "models": [
+          { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "contextWindow": 200000, "maxTokens": 16384 }
+        ]
+      }
+    }
+  },
+  "agents": { "defaults": { "model": "litellm/claude-sonnet-4-6" } },
+  "gateway": { "mode": "local" }
 }
 EOF
 
-# 5. Start the gateway
+# 4. 启动
 openclaw gateway start
 ```
 
-> **Tip**: If LiteLLM and OpenClaw are in the same VPC, use the internal ALB DNS
-> (e.g., `http://internal-k8s-litellm-xxxx.us-west-2.elb.amazonaws.com`) for lower
-> latency and no data transfer costs.
+> **提示**：如果 LiteLLM 和 OpenClaw 在同一个 VPC，使用内部 ALB DNS（如 `http://internal-k8s-litellm-xxxx.elb.amazonaws.com`）可降低延迟和数据传输费用。
 
 ---
 
-## Troubleshooting
+## 故障排查
 
-### "Model not found" error
+### "Model not found" 错误
 
-Ensure the model name in `openclaw.json` matches a model alias in your LiteLLM config:
+确保 `openclaw.json` 中的模型名称与 LiteLLM 配置中的别名匹配：
 
 ```bash
-# List available models
 curl -s https://litellm.example.com/v1/models \
-  -H "Authorization: Bearer sk-your-key" | jq '.data[].id' | head -20
+  -H "Authorization: Bearer <your-key>" | jq '.data[].id' | head -20
 ```
 
-### Connection timeout
+### 连接超时
 
-- Verify LiteLLM is reachable: `curl -s https://litellm.example.com/health/liveliness`
-- Check security groups allow traffic from OpenClaw's IP/VPC
-- If using internal ALB, ensure OpenClaw EC2 is in the same VPC or has VPC peering
+- 确认 LiteLLM 可达：`curl -s https://litellm.example.com/health/liveliness`
+- 检查安全组是否允许来自 OpenClaw 所在 IP/VPC 的流量
+- 使用内部 ALB 时，确保 OpenClaw EC2 在同一 VPC 或已建立 VPC Peering
 
-### Streaming issues
+### 流式传输问题
 
-OpenClaw requires streaming support. Verify:
+OpenClaw 需要流式支持，验证方式：
 
 ```bash
 curl -N https://litellm.example.com/v1/chat/completions \
-  -H "Authorization: Bearer sk-your-key" \
+  -H "Authorization: Bearer <your-key>" \
   -H "Content-Type: application/json" \
   -d '{"model":"claude-sonnet-4-6","messages":[{"role":"user","content":"Hi"}],"max_tokens":10,"stream":true}'
 ```
 
-You should see `data: {...}` chunks arriving incrementally.
-
-### Token usage not appearing
-
-- Check LiteLLM logs: `kubectl logs -n litellm -l app=litellm --tail 50`
-- Ensure RDS is connected: usage data is stored in PostgreSQL
-- Visit Admin UI → Usage tab
+应看到 `data: {...}` 数据块逐步到达。
 
 ---
 
-## Security Considerations
+## 安全建议
 
-- **API Key rotation**: Create dedicated LiteLLM keys for each OpenClaw instance via Admin UI; revoke individually if compromised
-- **Network isolation**: Place OpenClaw and LiteLLM in the same VPC; use internal ALB for API traffic
-- **Budget limits**: Set per-key spending limits in LiteLLM to prevent runaway costs
-- **Audit trail**: LiteLLM logs all requests with model, tokens, cost, and key metadata
+- **API Key 轮换**：通过 LiteLLM Admin UI 为每个 OpenClaw 实例创建独立 Key，泄露时可单独撤销
+- **网络隔离**：将 OpenClaw 和 LiteLLM 部署在同一 VPC，使用内部 ALB 通信
+- **预算限制**：在 LiteLLM 设置 per-key 消费上限，防止成本失控
+- **审计追踪**：LiteLLM 记录所有请求的模型、token 数、成本和 Key 元数据
 
 ---
 
-## Related Documentation
+## 相关文档
 
-- [OpenClaw Docs](https://docs.openclaw.ai) — Full OpenClaw documentation
-- [OpenClaw GitHub](https://github.com/openclaw/openclaw) — Source code
-- [LiteLLM Docs](https://docs.litellm.ai) — LiteLLM proxy documentation
-- [Claude Code Guide](claude-code.md) — Configure Claude Code with LiteLLM
-- [API Usage](API_USAGE.md) — Direct API call examples (OpenAI SDK, Anthropic SDK, cURL)
+- [OpenClaw 文档](https://docs.openclaw.ai) — 完整 OpenClaw 文档
+- [OpenClaw GitHub](https://github.com/openclaw/openclaw) — 源码
+- [LiteLLM 文档](https://docs.litellm.ai) — LiteLLM 代理文档
+- [Claude Code 指南](claude-code.md) — Claude Code 配置
+- [API 使用示例](API_USAGE.md) — 直接 API 调用示例
