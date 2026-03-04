@@ -48,7 +48,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: litellm
+            name: litellm-service
             port:
               number: 80
 
@@ -82,35 +82,35 @@ spec:
         pathType: Exact
         backend:
           service:
-            name: litellm
+            name: litellm-service
             port:
               number: 80
       - path: /v1
         pathType: Prefix
         backend:
           service:
-            name: litellm
+            name: litellm-service
             port:
               number: 80
       - path: /key
         pathType: Prefix
         backend:
           service:
-            name: litellm
+            name: litellm-service
             port:
               number: 80
       - path: /model
         pathType: Prefix
         backend:
           service:
-            name: litellm
+            name: litellm-service
             port:
               number: 80
       - path: /health
         pathType: Prefix
         backend:
           service:
-            name: litellm
+            name: litellm-service
             port:
               number: 80
 
@@ -144,6 +144,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: litellm
+            name: litellm-service
             port:
               number: 80
