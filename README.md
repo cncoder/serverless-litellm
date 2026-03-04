@@ -141,12 +141,15 @@ claude --model claude-haiku-4-5      # Haiku 快速响应
 
 | 文档 | 说明 |
 |------|------|
-| [docs/openclaw.md](docs/openclaw.md) | OpenClaw AI 助手框架集成（中文） |
+| [docs/architecture.md](docs/architecture.md) | 架构设计详解（EKS, IRSA, Fargate, 网络拓扑） |
+| [docs/openclaw.md](docs/openclaw.md) | OpenClaw AI 助手框架集成 + Amazon DCV 远程桌面 |
 | [docs/claude-code.md](docs/claude-code.md) | Claude Code 配置、1M context、模型选择 |
 | [docs/API_USAGE.md](docs/API_USAGE.md) | OpenAI SDK / Anthropic SDK / cURL 调用示例 |
 | [docs/models.md](docs/models.md) | 可用模型列表、Fallback 链、路由策略 |
+| [docs/bedrock-monitoring-guide.md](docs/bedrock-monitoring-guide.md) | Bedrock 用量监控与成本分析 |
 | [docs/manual-deploy.md](docs/manual-deploy.md) | 手动部署步骤（Terraform 变量、两阶段 ACM） |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | 常见问题、调试命令、清理资源 |
+| [docs/testing-guide.md](docs/testing-guide.md) | 完整测试指南（功能 / 性能 / HA / 安全） |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | 故障排查手册（真实生产环境经验） |
 | [docs/e2e-test-report.md](docs/e2e-test-report.md) | 端到端测试报告（14 项全通过） |
 
 ## 目录结构
