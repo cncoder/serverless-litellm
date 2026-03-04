@@ -67,7 +67,7 @@ resource "null_resource" "deploy_litellm" {
       export DB_PASSWORD_SECRET_ID="${var.db_password_secret_id}"
       export DATABASE_URL_BASE="${var.database_url_base}"
       export AWS_REGION_VAL="${var.aws_region}"
-      envsubst < ${path.root}/../kubernetes/deployment.yaml | kubectl apply -f -
+      envsubst '$ECR_REPOSITORY_URL $MASTER_KEY_SECRET_ID $DB_PASSWORD_SECRET_ID $DATABASE_URL_BASE $AWS_REGION_VAL' < ${path.root}/../kubernetes/deployment.yaml | kubectl apply -f -
 
       # Apply service
       kubectl apply -f ${path.root}/../kubernetes/service.yaml
