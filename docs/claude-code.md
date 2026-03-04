@@ -4,6 +4,23 @@
 
 ---
 
+## 安装 Claude Code
+
+```bash
+# macOS / Linux / WSL
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Homebrew
+brew install claude-code
+
+# Windows PowerShell
+irm https://claude.ai/install.ps1 | iex
+```
+
+> 详细安装文档及使用指南：https://code.claude.com/docs/en/quickstart
+
+---
+
 ## 快速开始（export 方式）
 
 ```bash
@@ -148,3 +165,10 @@ EOF
 
 echo "Done! Run: claude --print 'hello'"
 ```
+
+---
+
+## 参考文档
+
+- [Claude Code 快速开始](https://code.claude.com/docs/en/quickstart) — 安装、配置、使用指南
+- [LiteLLM + Claude Responses API](https://docs.litellm.ai/docs/tutorials/claude_responses_api) — LiteLLM 代理 Claude API 的详细配置
