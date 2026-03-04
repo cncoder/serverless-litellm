@@ -1,30 +1,31 @@
-# LiteLLM on EKS — 企业级 AI 网关
+# LiteLLM on EKS — 基于 Bedrock 的企业级 AI 网关
 
-> 在 AWS EKS Fargate 上部署 LiteLLM 代理，为企业提供统一、安全、可控的 AI 模型访问层
+> 在 AWS EKS Fargate 上部署 LiteLLM 代理，充分利用 Amazon Bedrock 的服务能力，为企业提供统一、安全、可控的 AI 模型访问层
 
-## 为什么需要 AI 网关？
+## 为什么基于 Bedrock？
 
-直接让开发团队调用 AI API 会带来一系列企业级问题：
+Amazon Bedrock 本身已经是一个托管的模型服务平台，但在企业多团队使用场景下，仍需要一个**应用层网关**来补齐管控能力：
 
-| 问题 | 直连 API | 通过 LiteLLM 网关 |
-|------|----------|-------------------|
-| **密钥管理** | 每人一个 Anthropic/OpenAI Key，离职/泄露难追踪 | 统一发放 LiteLLM Key，随时撤销，零 vendor key 暴露 |
-| **成本可控** | 无法限额，月底账单才知道超支 | per-key / per-team 预算上限，实时用量仪表盘 |
-| **用量审计** | 散落在各 vendor 后台，无法归因到人 | 每笔请求记录 who/when/model/tokens/cost，满足合规审计 |
-| **模型切换** | 改代码、改配置、改 SDK，全员受影响 | 网关层改路由，下游代码零改动 |
-| **故障容灾** | 单 provider 宕机 = 全员停工 | 自动 fallback（Opus → Sonnet → Haiku），多 region 冗余 |
-| **合规管控** | API Key 可能被用于非授权用途 | 网关层限制可用模型、速率、输入/输出内容审查 |
+### Bedrock 已有的能力（本方案充分利用）
 
-**一句话：LiteLLM 是企业使用 AI 的「统一入口 + 管控层 + 审计层」。**
+- **无服务器推理** — 按 token 付费，无需管理 GPU 实例
+- **跨 Region 推理** — Cross-Region Inference Profile（`global.*` 前缀），自动路由到最优 Region，提升吞吐、降低延迟
+- **IAM 原生鉴权** — 与 AWS 权限体系深度集成，无需管理第三方 API Key
+- **多模型供应** — Claude 全系列 + Llama + Mistral + Titan 等，同一 API 接口调用
+- **数据驻留** — 请求数据不出 AWS 账户，满足合规要求
 
-## 为什么选 LiteLLM？
+### LiteLLM 网关补齐的能力
 
-- **100+ 模型供应商**：Bedrock、OpenAI、Azure、Google、Cohere… 一套 API 全覆盖
-- **OpenAI 兼容 API**：现有代码用 OpenAI SDK 的，换个 `base_url` 即可迁移
-- **同时支持 Anthropic API 格式**：Claude Code、Cursor 等工具直接对接，无需适配
-- **开源 + 自托管**：数据不出 VPC，满足金融/医疗/政府等行业数据驻留要求
-- **Admin UI**：可视化管理 Key、查看用量、配置路由，非技术人员也能操作
-- **活跃社区**：GitHub 30K+ Star，持续迭代，企业生产验证
+| Bedrock 原生 | + LiteLLM 网关 |
+|-------------|----------------|
+| IAM 粒度到 Role/Policy | **per-user API Key**，每人独立配额和用量追踪 |
+| CloudWatch 指标 | **实时 Admin UI 仪表盘**，按人/团队/模型/项目维度拆账 |
+| 无内置降级逻辑 | **自动 Fallback 链**（Opus → Sonnet → Haiku），跨模型容灾 |
+| SDK 调用需 Bedrock 格式 | **OpenAI + Anthropic 双格式兼容**，Claude Code / Cursor / OpenClaw 零改造接入 |
+| 无速率限制 per-user | **per-key 速率限制 + 预算上限**，防止单人打爆配额 |
+| 每次调用需 AWS 凭证 | **统一 API Key**，开发者无需配置 AWS 环境，降低 onboarding 成本 |
+
+**一句话：Bedrock 管模型和推理，LiteLLM 管人和成本。两者结合 = 企业级 AI 基础设施。**
 
 ## 典型企业场景
 
