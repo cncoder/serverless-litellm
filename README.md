@@ -16,50 +16,9 @@ Bedrock 管模型和推理，LiteLLM 管人和成本。
 
 ## 架构
 
-```mermaid
-flowchart LR
-    subgraph Clients["客户端"]
-        direction TB
-        CC["🖥 Claude Code"]
-        OC["🤖 OpenClaw"]
-        App["📱 自研应用"]
-    end
-
-    subgraph Gateway["AWS — 网关层"]
-        ALB["⚡ ALB\nHTTPS · WAF"]
-        Auth{"鉴权分流"}
-        APIKey["/v1/*\nAPI Key"]
-        Cognito["/ui\nCognito"]
-    end
-
-    subgraph Compute["AWS — 计算层"]
-        LLM["LiteLLM\nEKS Fargate\n2-10 pods · IRSA"]
-    end
-
-    subgraph Storage["AWS — 存储"]
-        RDS[("RDS\nPostgreSQL")]
-    end
-
-    subgraph Bedrock["Amazon Bedrock"]
-        direction TB
-        West["us-west-2"]
-        East["us-east-1"]
-    end
-
-    Clients --> ALB
-    ALB --> Auth
-    Auth --> APIKey & Cognito
-    APIKey & Cognito --> LLM
-    LLM <--> RDS
-    LLM --> West & East
-
-    style ALB fill:#ff9900,stroke:#ff9900,color:#fff
-    style LLM fill:#146eb4,stroke:#146eb4,color:#fff
-    style RDS fill:#3b48cc,stroke:#3b48cc,color:#fff
-    style West fill:#232f3e,stroke:#232f3e,color:#fff
-    style East fill:#232f3e,stroke:#232f3e,color:#fff
-    style Auth fill:#fff,stroke:#ff9900,color:#333
-```
+<p align="center">
+  <img src="docs/architecture.svg" alt="Architecture" width="100%"/>
+</p>
 
 ## 特性
 
