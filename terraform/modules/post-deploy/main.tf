@@ -17,14 +17,18 @@ resource "null_resource" "build_push_image" {
 
   provisioner "local-exec" {
     command = <<-EOT
+      # Ensure Docker is running
+      sudo systemctl start docker 2>/dev/null || sudo service docker start 2>/dev/null || true
+      sudo usermod -aG docker $(whoami) 2>/dev/null || true
+
       # Login to ECR
       aws ecr get-login-password --region ${var.aws_region} | \
-        docker login --username AWS --password-stdin ${var.ecr_repository_url}
+        sudo docker login --username AWS --password-stdin ${var.ecr_repository_url}
 
       # Build and push (linux/amd64 required for Fargate x86_64)
-      docker build --platform linux/amd64 -t litellm-custom ${path.root}/../docker/
-      docker tag litellm-custom:latest ${var.ecr_repository_url}:latest
-      docker push ${var.ecr_repository_url}:latest
+      sudo docker build --platform linux/amd64 -t litellm-custom ${path.root}/../docker/
+      sudo docker tag litellm-custom:latest ${var.ecr_repository_url}:latest
+      sudo docker push ${var.ecr_repository_url}:latest
 
       echo "Docker image pushed to ${var.ecr_repository_url}:latest"
     EOT

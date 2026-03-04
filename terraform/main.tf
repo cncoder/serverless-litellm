@@ -9,6 +9,21 @@ locals {
   private_subnet_ids = var.create_vpc ? module.vpc[0].private_subnet_ids : var.existing_private_subnet_ids
 }
 
+# Tag existing subnets for ALB Controller auto-discovery (required when using existing VPC)
+resource "aws_ec2_tag" "public_subnet_elb" {
+  count       = var.create_vpc ? 0 : length(var.existing_public_subnet_ids)
+  resource_id = var.existing_public_subnet_ids[count.index]
+  key         = "kubernetes.io/cluster/${local.cluster_name}"
+  value       = "shared"
+}
+
+resource "aws_ec2_tag" "private_subnet_internal_elb" {
+  count       = var.create_vpc ? 0 : length(var.existing_private_subnet_ids)
+  resource_id = var.existing_private_subnet_ids[count.index]
+  key         = "kubernetes.io/cluster/${local.cluster_name}"
+  value       = "shared"
+}
+
 # VPC Module
 module "vpc" {
   count  = var.create_vpc ? 1 : 0
