@@ -83,10 +83,15 @@ resource "null_resource" "deploy_litellm" {
 
       if [ -z "${var.acm_certificate_arn}" ]; then
         echo "No ACM certificate provided - deploying HTTP only (port 80)"
-        envsubst < ${path.root}/../kubernetes/ingress-http.yaml | kubectl apply -f -
+        # Restrict envsubst to specific variables; strip empty host lines for catch-all routing
+        envsubst '$LITELLM_HOST $BOT_HOST' < ${path.root}/../kubernetes/ingress-http.yaml \
+          | sed '/^[[:space:]]*host:[[:space:]]*$/d' \
+          | kubectl apply -f -
       else
         echo "ACM certificate found - deploying HTTPS (port 443)"
-        envsubst < ${path.root}/../kubernetes/ingress.yaml | kubectl apply -f -
+        envsubst '$LITELLM_HOST $BOT_HOST $ACM_CERTIFICATE_ARN' < ${path.root}/../kubernetes/ingress.yaml \
+          | sed '/^[[:space:]]*host:[[:space:]]*$/d' \
+          | kubectl apply -f -
       fi
 
       # Conditionally apply Cognito ingress
@@ -96,7 +101,9 @@ resource "null_resource" "deploy_litellm" {
         export COGNITO_USER_POOL_DOMAIN="${var.cognito_user_pool_domain}"
         # Remove non-cognito UI ingress and apply cognito version
         kubectl delete ingress litellm-ingress-ui -n litellm --ignore-not-found
-        envsubst < ${path.root}/../kubernetes/ingress-cognito.yaml | kubectl apply -f -
+        envsubst '$LITELLM_HOST $ACM_CERTIFICATE_ARN $COGNITO_USER_POOL_ARN $COGNITO_USER_POOL_CLIENT_ID $COGNITO_USER_POOL_DOMAIN' < ${path.root}/../kubernetes/ingress-cognito.yaml \
+          | sed '/^[[:space:]]*host:[[:space:]]*$/d' \
+          | kubectl apply -f -
         echo "Cognito UI authentication enabled"
       else
         echo "Cognito UI authentication disabled"
