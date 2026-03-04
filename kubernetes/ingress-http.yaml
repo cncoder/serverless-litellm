@@ -32,6 +32,7 @@ metadata:
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/group.name: litellm-shared
     alb.ingress.kubernetes.io/group.order: "5"
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=600
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /health/liveliness
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"

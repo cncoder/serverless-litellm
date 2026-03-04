@@ -32,6 +32,9 @@ metadata:
     alb.ingress.kubernetes.io/group.name: litellm-shared        # 共享 ALB 组名
     alb.ingress.kubernetes.io/group.order: "50"                 # 优先级 50 (最低)
 
+    # ALB 超时配置 (Opus extended thinking 可能需要数分钟)
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=600
+
     # HTTPS 配置
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
     alb.ingress.kubernetes.io/certificate-arn: ${ACM_CERTIFICATE_ARN}
