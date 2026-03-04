@@ -1,55 +1,20 @@
 # LiteLLM on EKS — 基于 Bedrock 的企业级 AI 网关
 
-> 在 AWS EKS Fargate 上部署 LiteLLM 代理，充分利用 Amazon Bedrock 的服务能力，为企业提供统一、安全、可控的 AI 模型访问层
+> 在 AWS EKS Fargate 上部署 LiteLLM，充分利用 Bedrock 的模型服务能力，补齐企业多团队管控层
 
-## 为什么基于 Bedrock？
+## Bedrock + LiteLLM = ？
 
-Amazon Bedrock 本身已经是一个托管的模型服务平台，但在企业多团队使用场景下，仍需要一个**应用层网关**来补齐管控能力：
+**Bedrock 管模型和推理，LiteLLM 管人和成本。**
 
-### Bedrock 已有的能力（本方案充分利用）
+Bedrock 已经提供了无服务器推理、跨 Region 负载均衡（Cross-Region Inference Profile）、IAM 鉴权和数据驻留。但企业多团队使用时，还需要：
 
-- **无服务器推理** — 按 token 付费，无需管理 GPU 实例
-- **跨 Region 推理** — Cross-Region Inference Profile（`global.*` 前缀），自动路由到最优 Region，提升吞吐、降低延迟
-- **IAM 原生鉴权** — 与 AWS 权限体系深度集成，无需管理第三方 API Key
-- **多模型供应** — Claude 全系列 + Llama + Mistral + Titan 等，同一 API 接口调用
-- **数据驻留** — 请求数据不出 AWS 账户，满足合规要求
+- **per-user API Key** — 每人独立配额，离职即撤销，不暴露 AWS 凭证
+- **实时用量仪表盘** — 按人 / 团队 / 模型 / 项目维度拆账，不用等月底 CUR
+- **自动 Fallback** — Opus 超时切 Sonnet 切 Haiku，跨模型容灾
+- **双 API 格式** — OpenAI + Anthropic 格式同时支持，Claude Code / Cursor / OpenClaw 零改造接入
+- **per-key 限速限额** — 防止单人打爆 Bedrock 配额
 
-### LiteLLM 网关补齐的能力
-
-| Bedrock 原生 | + LiteLLM 网关 |
-|-------------|----------------|
-| IAM 粒度到 Role/Policy | **per-user API Key**，每人独立配额和用量追踪 |
-| CloudWatch 指标 | **实时 Admin UI 仪表盘**，按人/团队/模型/项目维度拆账 |
-| 无内置降级逻辑 | **自动 Fallback 链**（Opus → Sonnet → Haiku），跨模型容灾 |
-| SDK 调用需 Bedrock 格式 | **OpenAI + Anthropic 双格式兼容**，Claude Code / Cursor / OpenClaw 零改造接入 |
-| 无速率限制 per-user | **per-key 速率限制 + 预算上限**，防止单人打爆配额 |
-| 每次调用需 AWS 凭证 | **统一 API Key**，开发者无需配置 AWS 环境，降低 onboarding 成本 |
-
-**一句话：Bedrock 管模型和推理，LiteLLM 管人和成本。两者结合 = 企业级 AI 基础设施。**
-
-## 典型企业场景
-
-### 🏢 开发团队（10-100 人）
-- 每位开发者分配独立 LiteLLM Key，设定月度 token 预算
-- 统一走 Bedrock，无需每人申请 Anthropic 账号
-- Claude Code + Cursor + 自研工具全部指向同一网关
-
-### 🔒 安全合规
-- 所有 AI 请求经过 VPC 内网关，不直连外部 API
-- WAF 速率限制 + Cognito 身份认证（可选）
-- 请求/响应日志存 RDS，可对接 SIEM 审计系统
-
-### 💰 成本优化
-- 智能路由：简单任务走 Haiku（$0.25/M tokens），复杂任务走 Opus（$15/M tokens）
-- 自动降级：Opus 超时自动切 Sonnet，保证可用性的同时降低 P99 成本
-- 实时仪表盘：按团队/项目/模型维度拆分账单
-
-### 🔄 多模型策略
-- 灰度升级：新版模型（如 Sonnet 4.5 → 4.6）先给 10% 流量验证效果，逐步全量切换
-- 智能降级：Opus 超时/限流时自动切 Sonnet，保证可用性
-- 多 Region 冗余：`global.*` Inference Profile 跨 Region 负载均衡，单 Region 故障自动切换
-
----
+LiteLLM 作为应用层网关，补齐这些能力。开发者只需一个 API Key，无需配置 AWS 环境。
 
 ## 架构
 
