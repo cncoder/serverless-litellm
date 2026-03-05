@@ -123,6 +123,16 @@ claude --model claude-haiku-4-5      # Haiku — fastest
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Troubleshooting handbook (real production experience) |
 | [docs/e2e-test-report.md](docs/e2e-test-report.md) | E2E test report (14/14 passed) |
 
+## CloudFront + WAF Hardening
+
+After deployment, harden your ALB with CloudFront + WAF for three layers of protection:
+
+1. **ALB Security Group** — Only allow CloudFront IP ranges
+2. **WAF Header Verification** — Block direct requests that bypass CloudFront
+3. **WAF Path Whitelist** — Expose only API paths, block Admin UI and management endpoints
+
+See [skills/cloudfront-waf-hardening/SKILL.md](skills/cloudfront-waf-hardening/SKILL.md) for step-by-step instructions, path whitelist templates, and rollback procedures.
+
 ## Directory Structure
 
 ```
@@ -132,6 +142,7 @@ claude --model claude-haiku-4-5      # Haiku — fastest
 ├── scripts/
 │   ├── setup.sh                # One-click deploy
 │   └── setup-claude-code.sh    # Claude Code setup
+├── skills/             # Claude Code Skills (reusable runbooks)
 └── docs/               # Documentation
 ```
 

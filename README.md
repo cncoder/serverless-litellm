@@ -123,6 +123,16 @@ claude --model claude-haiku-4-5      # Haiku 快速响应
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 故障排查手册（真实生产环境经验） |
 | [docs/e2e-test-report.md](docs/e2e-test-report.md) | 端到端测试报告（14 项全通过） |
 
+## CloudFront + WAF 加固
+
+部署完成后，建议通过 CloudFront + WAF 加固 ALB，实现三层防护：
+
+1. **ALB Security Group** — 仅允许 CloudFront IP 段访问
+2. **WAF Header 校验** — 阻止不经 CloudFront 的直接请求
+3. **WAF 路径白名单** — 仅开放 API 路径，屏蔽 Admin UI 等管理接口
+
+详见 [skills/cloudfront-waf-hardening/SKILL.md](skills/cloudfront-waf-hardening/SKILL.md)，包含完整操作步骤、路径白名单模板和回滚方案。
+
 ## 目录结构
 
 ```
@@ -132,6 +142,7 @@ claude --model claude-haiku-4-5      # Haiku 快速响应
 ├── scripts/
 │   ├── setup.sh                # 一键部署
 │   └── setup-claude-code.sh    # Claude Code 配置
+├── skills/             # Claude Code Skills（可复用操作手册）
 └── docs/               # 详细文档
 ```
 
