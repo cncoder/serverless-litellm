@@ -146,6 +146,27 @@ claude --model claude-haiku-4-5      # Haiku 快速响应
 └── docs/               # 详细文档
 ```
 
+## 超时与 LLM 调用限制
+
+LLM 推理（尤其是 Opus）可能需要较长时间，各组件超时已预配置对齐：
+
+| 组件 | 默认值 | 本项目配置 | 说明 |
+|------|--------|-----------|------|
+| CloudFront OriginReadTimeout | 30s | 60s（默认上限） | 首字节必须在 60s 内返回；**Streaming (SSE) 不受此限制**，首字节到达后流式传输无时间限制 |
+| ALB Idle Timeout | 60s | 600s | 连接空闲超过此时间会被断开 |
+| LiteLLM request_timeout | 600s | 600s | 代理层请求超时 |
+| LiteLLM model timeout | 600s | 600s | 单模型调用超时，超时后触发 Fallback |
+| K8s Ingress idle_timeout | 60s | 600s | ALB Ingress 注解配置 |
+
+**常见问题：**
+
+- **Claude Code 长时间推理中断？** — Claude Code 默认走 Streaming，CloudFront 60s 限制仅针对首字节。如果首字节超过 60s（极罕见），需向 AWS Support 申请提高 OriginReadTimeout 上限
+- **非 Streaming 请求 504？** — 非流式调用（如 `/v1/completions` 不带 `stream:true`）受 CloudFront 60s 首字节限制，Opus 复杂推理可能超时。建议始终使用 `stream: true`
+- **Fallback 触发过早？** — 检查 `configmap.yaml` 中 `timeout` 和 `num_retries` 配置，默认 3 次失败后切换备用模型
+- **连接空闲断开？** — ALB idle timeout 600s，10 分钟内无数据传输会断开。正常 Streaming 场景不会触发
+
+> 如需调整超时，修改 `kubernetes/configmap.yaml`（LiteLLM）和 `kubernetes/ingress.yaml`（ALB），CloudFront 需在 AWS 控制台或 CLI 修改。
+
 ## License
 
 MIT

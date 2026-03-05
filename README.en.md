@@ -146,6 +146,27 @@ See [skills/cloudfront-waf-hardening/SKILL.md](skills/cloudfront-waf-hardening/S
 └── docs/               # Documentation
 ```
 
+## Timeout & LLM Call Limits
+
+LLM inference (especially Opus) can take significant time. All component timeouts are pre-configured and aligned:
+
+| Component | Default | This Project | Notes |
+|-----------|---------|-------------|-------|
+| CloudFront OriginReadTimeout | 30s | 60s (max default) | First byte must arrive within 60s; **Streaming (SSE) is NOT limited** — once the first byte arrives, the stream continues indefinitely |
+| ALB Idle Timeout | 60s | 600s | Connection drops if idle beyond this |
+| LiteLLM request_timeout | 600s | 600s | Proxy-level request timeout |
+| LiteLLM model timeout | 600s | 600s | Per-model call timeout; triggers fallback on expiry |
+| K8s Ingress idle_timeout | 60s | 600s | ALB Ingress annotation |
+
+**Common Issues:**
+
+- **Claude Code interrupted during long reasoning?** — Claude Code uses Streaming by default. The CloudFront 60s limit only applies to the first byte. If the first byte exceeds 60s (extremely rare), request an OriginReadTimeout increase from AWS Support
+- **504 on non-streaming requests?** — Non-streaming calls (e.g., `/v1/completions` without `stream:true`) are subject to CloudFront's 60s first-byte limit. Complex Opus reasoning may timeout. Always use `stream: true`
+- **Fallback triggered too early?** — Check `timeout` and `num_retries` in `configmap.yaml`. Default: switch to backup model after 3 failures
+- **Connection dropped while idle?** — ALB idle timeout is 600s. Connections with no data for 10 minutes will be terminated. Normal streaming scenarios won't trigger this
+
+> To adjust timeouts: modify `kubernetes/configmap.yaml` (LiteLLM) and `kubernetes/ingress.yaml` (ALB). CloudFront timeouts require AWS Console or CLI changes.
+
 ## License
 
 MIT
