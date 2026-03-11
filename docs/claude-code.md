@@ -2,7 +2,7 @@
 
 通过 LiteLLM 代理使用 Claude Code，后端为 AWS Bedrock，**无需 Anthropic 官方 API Key**。
 
-## TL;DR
+## 快速开始
 
 ```bash
 # 1. 安装
