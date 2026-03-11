@@ -62,16 +62,24 @@ cd serverless-litellm
 
 ## 配置 Claude Code
 
-两行命令即可让 Claude Code 通过 LiteLLM 走 Bedrock：
+推荐使用 `settings.json` 一键配置，**只需替换 2 个值**：
 
 ```bash
-export ANTHROPIC_BASE_URL="https://<your-domain>"
-export ANTHROPIC_API_KEY="<your-litellm-key>"
+mkdir -p ~/.claude
+cat > ~/.claude/settings.json << 'EOF'
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://<your-domain>",
+    "ANTHROPIC_API_KEY": "<your-litellm-key>"
+  },
+  "model": "claude-sonnet-4-6",
+  "smallFastModel": "claude-haiku-4-5"
+}
+EOF
 
-claude
+claude --print "hello"
 ```
-
-> ⚠️ `ANTHROPIC_BASE_URL` 不要加 `/v1` 后缀 — Claude Code 会自动拼接 `/v1/messages`
 
 切换模型：
 
@@ -79,9 +87,22 @@ claude
 claude --model claude-opus-4-6       # Opus 最强推理
 claude --model claude-sonnet-4-6     # Sonnet 均衡（默认）
 claude --model claude-haiku-4-5      # Haiku 快速响应
+claude --model opus                  # 短名也支持
 ```
 
-> 详细说明见 [docs/claude-code.md](docs/claude-code.md)
+### Prompt Caching ✅
+
+Bedrock 原生支持 Prompt Caching，Claude Code 通过 LiteLLM 自动生效，**无需额外配置**：
+
+- Cache read 仅为基础 input 成本的 **10%**（~90% 节省）
+- 最多 4 个 cache checkpoint，默认 5 分钟 TTL
+- 经实测验证：2860 tokens 首次写入 → 后续请求全部命中缓存
+
+### 从 Bedrock 直连迁移
+
+如果之前直接使用 Bedrock，需删除 settings.json 中的冲突字段：`CLAUDE_CODE_USE_BEDROCK`、`AWS_REGION`、`ANTHROPIC_MODEL`。
+
+> 详细说明见 [docs/claude-code.md](docs/claude-code.md)（含完整迁移 diff、Troubleshooting）
 
 ## 配置 OpenClaw
 
