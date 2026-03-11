@@ -114,6 +114,15 @@ spec:
             port:
               number: 80
 
+      # Bedrock Pass-through 端点 (需要 enable_passthrough_endpoints: true)
+      - path: /bedrock
+        pathType: Prefix
+        backend:
+          service:
+            name: litellm-service
+            port:
+              number: 80
+
 ---
 # UI Ingress
 apiVersion: networking.k8s.io/v1
