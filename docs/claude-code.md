@@ -2,6 +2,34 @@
 
 通过 LiteLLM 代理使用 Claude Code，后端为 AWS Bedrock，**无需 Anthropic 官方 API Key**。
 
+## TL;DR
+
+```bash
+# 1. 安装
+curl -fsSL https://claude.ai/install.sh | bash
+
+# 2. 写配置（替换 YOUR_LITELLM_DOMAIN 和 YOUR_LITELLM_KEY）
+cat > ~/.claude/settings.json << 'EOF'
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://YOUR_LITELLM_DOMAIN",
+    "ANTHROPIC_API_KEY": "YOUR_LITELLM_KEY"
+  },
+  "model": "claude-sonnet-4-6",
+  "smallFastModel": "claude-haiku-4-5"
+}
+EOF
+
+# 3. 确保没有 Bedrock 残留
+unset CLAUDE_CODE_USE_BEDROCK AWS_REGION
+sed -i '' '/CLAUDE_CODE_USE_BEDROCK/d; /^export AWS_REGION/d' ~/.zshrc 2>/dev/null
+
+# 4. 验证
+claude --print "hello world"
+```
+
+> 如果之前用过 Bedrock 直连，务必执行第 3 步。详见 [从 Bedrock 直连迁移](#从-bedrock-直连迁移)。
+
 ---
 
 ## 安装 Claude Code
@@ -21,7 +49,7 @@ irm https://claude.ai/install.ps1 | iex
 
 ---
 
-## 配置
+## 配置 — CLI
 
 将以下内容写入 `~/.claude/settings.json`，**替换 2 个值**即可使用：
 
@@ -40,7 +68,7 @@ irm https://claude.ai/install.ps1 | iex
 }
 ```
 
-> ⚠️ `ANTHROPIC_BASE_URL` 不要加 `/v1` 后缀 — Claude Code 会自动拼接 `/v1/messages`
+> ⚠️ `ANTHROPIC_BASE_URL` **不要加 `/v1` 后缀** — Claude Code 会自动拼接 `/v1/messages`
 
 验证：
 
@@ -50,39 +78,38 @@ claude --print "hello world"
 
 ---
 
-## VS Code / Cursor 集成
+## 配置 — VS Code / Cursor
 
-VS Code 扩展**共享** `~/.claude/settings.json`，不需要单独配置 API 地址和 Key。
+VS Code 扩展和 CLI **共享 `~/.claude/settings.json`**，API 配置只需写一次。
 
-只需在 VS Code 设置中补充两项：
-
-### Step 1：VS Code 设置
-
-打开 VS Code → `Cmd+Shift+P` → `Preferences: Open User Settings (JSON)`，添加：
+VS Code 侧只需补充两个扩展设置：
 
 ```json
+// VS Code Settings (Cmd+Shift+P → Preferences: Open User Settings JSON)
 {
   "claudeCode.disableLoginPrompt": true,
   "claudeCode.selectedModel": "claude-sonnet-4-6"
 }
 ```
 
-- `disableLoginPrompt` — 跳过 Anthropic 登录提示（使用第三方 provider 必须开启）
-- `selectedModel` — 新对话默认模型（也可以在对话中用 `/model` 切换）
+| 设置 | 作用 |
+|------|------|
+| `disableLoginPrompt` | 跳过 Anthropic 登录（使用第三方 provider **必须开启**） |
+| `selectedModel` | 新对话默认模型，也可以在对话中用 `/model` 切换 |
 
-### Step 2：确认 `~/.claude/settings.json`
-
-确保上方「配置」段落中的 `~/.claude/settings.json` 已正确配置。VS Code 扩展和 CLI **共享这个文件**。
+> **`claudeCode.apiBaseUrl` 和 `claudeCode.apiKey` 不存在** — VS Code 扩展没有这两个设置项。API 地址和 Key 只能通过 `~/.claude/settings.json` 配置。
+>
+> 官方文档：https://code.claude.com/docs/en/vs-code
 
 ### 配置优先级
 
-| 优先级 | 位置 | 作用 |
-|--------|------|------|
-| 1（最高） | `~/.claude/settings.json` 的 `env` | API 地址、Key、环境变量 |
-| 2 | VS Code `claudeCode.*` 设置 | 模型选择、UI 行为 |
-| 3 | Shell 环境变量 | 被 settings.json 覆盖 |
-
-> **关键**：`claudeCode.apiBaseUrl` 和 `claudeCode.apiKey` 这两个 VS Code 设置**不存在**。API 配置只能通过 `~/.claude/settings.json` 的 `env` 字段设置。
+```
+~/.claude/settings.json env（最高）
+        ↓
+VS Code claudeCode.* 设置
+        ↓
+Shell 环境变量（最低，但会触发 AWS 环境检测！）
+```
 
 ---
 
@@ -135,30 +162,47 @@ Claude Code 内部使用 block-level `cache_control`，通过 LiteLLM → Bedroc
 
 ## Troubleshooting
 
-### CC 仍走 Bedrock 直连（`400 The provided model identifier is invalid`）
+### CC 仍走 Bedrock 直连
 
-Claude Code（CLI 和 VS Code 扩展共用检测逻辑）会**自动检测 AWS 环境**。如果检测到以下任意一项，它会绕过 `ANTHROPIC_BASE_URL` 直连 Bedrock：
+**症状**：`400 The provided model identifier is invalid` 或模型显示为 `us.anthropic.claude-*` 格式。
 
-**排查清单**（按优先级检查）：
+**原因**：Claude Code 自动检测 AWS 环境 — 只要发现 `CLAUDE_CODE_USE_BEDROCK=1` 或 `AWS_REGION`，就会绕过 `ANTHROPIC_BASE_URL` 直连 Bedrock。**CLI 和 VS Code 扩展共用同一套检测逻辑。**
+
+**一键排查**：
 
 ```bash
-# 1. 检查 shell 环境变量（最常见！）
-echo $CLAUDE_CODE_USE_BEDROCK
-echo $AWS_REGION
-
-# 2. 检查 shell 配置文件（.zshrc / .bashrc / .bash_profile）
-grep -n 'CLAUDE_CODE_USE_BEDROCK\|AWS_REGION' ~/.zshrc ~/.bashrc ~/.bash_profile 2>/dev/null
-
-# 3. 检查 ~/.claude/settings.json
-grep -E 'BEDROCK|AWS_REGION|ANTHROPIC_MODEL' ~/.claude/settings.json
-
-# 4. 检查 VS Code 用户设置
-grep -E 'BEDROCK|AWS_REGION' ~/Library/Application\ Support/Code/User/settings.json 2>/dev/null
+# 把这段全部复制粘贴执行
+echo "=== 1. Shell 环境变量 ==="
+echo "CLAUDE_CODE_USE_BEDROCK=$CLAUDE_CODE_USE_BEDROCK"
+echo "AWS_REGION=$AWS_REGION"
+echo ""
+echo "=== 2. Shell 配置文件 (.zshrc / .bashrc) ==="
+grep -n 'CLAUDE_CODE_USE_BEDROCK\|^export AWS_REGION' ~/.zshrc ~/.bashrc ~/.bash_profile 2>/dev/null || echo "(clean)"
+echo ""
+echo "=== 3. ~/.claude/settings.json ==="
+grep -E 'BEDROCK|AWS_REGION|ANTHROPIC_MODEL' ~/.claude/settings.json 2>/dev/null || echo "(clean)"
+echo ""
+echo "=== 4. VS Code 用户设置 ==="
+grep -E 'BEDROCK|AWS_REGION' ~/Library/Application\ Support/Code/User/settings.json 2>/dev/null || echo "(clean)"
 ```
 
-**解决**：删除所有匹配项，然后 `source ~/.zshrc` + 重启 VS Code。详见下方「从 Bedrock 直连迁移」。
+**清理方法**：
 
-> ⚠️ 很多用户在 `.zshrc` 中 `export CLAUDE_CODE_USE_BEDROCK=1` 或 `export AWS_REGION=us-west-2` 后忘了删，这会覆盖所有其他配置。建议将 CC 相关环境变量统一迁移到 `~/.claude/settings.json` 的 `env` 字段。
+```bash
+# 删除 .zshrc 中的 Bedrock 配置行
+sed -i '' '/CLAUDE_CODE_USE_BEDROCK/d' ~/.zshrc
+sed -i '' '/^export AWS_REGION/d' ~/.zshrc
+
+# 清除当前 shell
+unset CLAUDE_CODE_USE_BEDROCK AWS_REGION
+
+# 重载
+source ~/.zshrc
+```
+
+然后检查 `~/.claude/settings.json`，删除 `CLAUDE_CODE_USE_BEDROCK`、`AWS_REGION`、`ANTHROPIC_MODEL` 等字段。详见 [从 Bedrock 直连迁移](#从-bedrock-直连迁移)。
+
+> ⚠️ **最常见的坑**：`.zshrc` 里的 `export CLAUDE_CODE_USE_BEDROCK=1` 或 `export AWS_REGION=us-west-2`。很多用户配过 Bedrock 直连后忘了删，它会覆盖所有其他配置。
 
 ### `eager_input_streaming` 报错
 
@@ -168,13 +212,24 @@ grep -E 'BEDROCK|AWS_REGION' ~/Library/Application\ Support/Code/User/settings.j
 
 → 确认模型名在 [models.md](models.md) 列表中。如需新增别名，在 ConfigMap `model_list` 中添加条目。
 
-> 更多场景 → [troubleshooting.md](troubleshooting.md)
-
 ---
 
 ## 从 Bedrock 直连迁移
 
-如果之前直接对接 Bedrock（非 LiteLLM），`settings.json` 中以下字段**必须删除**：
+如果之前直接对接 Bedrock（非 LiteLLM），需要在**三个位置**清理旧配置：
+
+### 1. Shell 配置文件（`.zshrc` / `.bashrc`）
+
+```bash
+# 查找
+grep -n 'CLAUDE_CODE_USE_BEDROCK\|^export AWS_REGION\|ANTHROPIC_MODEL' ~/.zshrc
+
+# 删除匹配行（备份 .zshrc 后执行）
+sed -i '' '/CLAUDE_CODE_USE_BEDROCK/d; /^export AWS_REGION/d; /ANTHROPIC_MODEL/d' ~/.zshrc
+source ~/.zshrc
+```
+
+### 2. `~/.claude/settings.json`
 
 | 必须删除的字段 | 原因 |
 |--------------|------|
@@ -184,15 +239,9 @@ grep -E 'BEDROCK|AWS_REGION' ~/Library/Application\ Support/Code/User/settings.j
 | `CLAUDE_CODE_SUBAGENT_MODEL` | 同上 |
 | `CLAUDE_CODE_SMALL_FAST_MODEL` | 同上（改用顶层 `smallFastModel`）|
 
-### ⚠️ 三个地方都要清理
+### 3. VS Code 用户设置
 
-| 位置 | 检查命令 | 说明 |
-|------|---------|------|
-| **Shell 配置** | `grep -n BEDROCK ~/.zshrc ~/.bashrc` | `.zshrc` 里的 `export` 最容易被遗忘 |
-| **settings.json** | `grep BEDROCK ~/.claude/settings.json` | CC 专属配置文件 |
-| **VS Code 设置** | `grep BEDROCK ~/Library/.../settings.json` | `claudeCode.environmentVariables` |
-
-> Shell `export` 和 settings.json `env` **同时生效时，settings.json 优先**。但 shell 变量仍会被 CC 检测到用于 AWS 环境判断。**两边都要清理。**
+检查 `claudeCode.environmentVariables` 中是否有 Bedrock 相关变量，有则删除。
 
 ### 迁移 Diff
 
@@ -212,11 +261,24 @@ grep -E 'BEDROCK|AWS_REGION' ~/Library/Application\ Support/Code/User/settings.j
 + "smallFastModel": "claude-haiku-4-5"
 ```
 
+同时删除 `.zshrc` 中的：
+
+```diff
+- # Claude Code Bedrock Configuration
+- export CLAUDE_CODE_USE_BEDROCK=1
+- export AWS_REGION=us-west-2
+- export CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000
+```
+
+将需要保留的选项迁移到 `~/.claude/settings.json` 的 `env` 字段（如 `CLAUDE_CODE_MAX_OUTPUT_TOKENS`）。
+
 ---
 
 ## 参考文档
 
 - [Claude Code 快速开始](https://code.claude.com/docs/en/quickstart)
+- [Claude Code VS Code 扩展](https://code.claude.com/docs/en/vs-code)
 - [Claude Code LLM Gateway 配置](https://code.claude.com/docs/en/llm-gateway)
 - [LiteLLM + Claude API](https://docs.litellm.ai/docs/tutorials/claude_responses_api)
-- [Prompt Caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+- [Prompt Caching — AWS Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)
+- [Prompt Caching — Anthropic](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
