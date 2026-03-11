@@ -46,24 +46,34 @@ cd serverless-litellm
 
 ### 配置 Claude Code
 
-将以下内容写入 `~/.claude/settings.json`，**只需替换 2 个值**：
+**安装**：
 
-```json
+```bash
+# macOS / Linux / WSL（推荐）
+curl -fsSL https://claude.ai/install.sh | bash
+
+# npm
+npm install -g @anthropic-ai/claude-code
+```
+
+**配置** — 写入 `~/.claude/settings.json`，**只需替换 2 个值**：
+
+```jsonc
 {
   "env": {
-    "ANTHROPIC_BASE_URL": "https://<your-domain>",
-    "ANTHROPIC_API_KEY": "<your-litellm-key>"
+    "ANTHROPIC_BASE_URL": "https://<your-domain>",   // ← 替换
+    "ANTHROPIC_API_KEY": "<your-litellm-key>"         // ← 替换
   },
   "model": "claude-sonnet-4-6",
   "smallFastModel": "claude-haiku-4-5"
 }
 ```
 
-验证：`claude --print "hello"`
+**验证**：`claude --print "hello"`
 
 切换模型：`claude --model claude-opus-4-6` / `claude --model opus` / `claude --model claude-opus-4-1`
 
-> 详细配置（完整模板、迁移指南、Prompt Caching、Troubleshooting）→ [docs/claude-code.md](docs/claude-code.md)
+> 详细配置（可选参数、迁移指南、Prompt Caching、Troubleshooting）→ [docs/claude-code.md](docs/claude-code.md)
 
 ## 文档
 

@@ -2,51 +2,7 @@
 
 通过 LiteLLM 代理使用 Claude Code，后端为 AWS Bedrock，**无需 Anthropic 官方 API Key**。
 
----
-
-## 1. 安装
-
-```bash
-# macOS / Linux / WSL（推荐）
-curl -fsSL https://claude.ai/install.sh | bash
-
-# npm
-npm install -g @anthropic-ai/claude-code
-
-# Windows PowerShell
-irm https://claude.ai/install.ps1 | iex
-```
-
-## 2. 配置
-
-将以下内容写入 `~/.claude/settings.json`，**替换 2 个值**：
-
-```jsonc
-{
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://<YOUR_LITELLM_DOMAIN>",   // ← 必填
-    "ANTHROPIC_API_KEY": "<YOUR_LITELLM_KEY>",               // ← 必填
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "128000",               // ← 可选：最大输出 token
-    "CLAUDE_CODE_EFFORT_LEVEL": "medium",                    // ← 可选：推理深度
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"              // ← 可选：多 agent 协作
-  },
-  "model": "claude-sonnet-4-6",
-  "smallFastModel": "claude-haiku-4-5"
-}
-```
-
-> ⚠️ `ANTHROPIC_BASE_URL` **不要加 `/v1` 后缀** — Claude Code 会自动拼接 `/v1/messages`
->
-> 项目级配置：也可以在项目根目录创建 `.claude/settings.json`，格式相同，会覆盖全局配置。
-
-## 3. 验证
-
-```bash
-claude --print "hello world"
-```
-
-> 如果之前用过 Bedrock 直连，还需要清理旧配置。详见 [从 Bedrock 直连迁移](#从-bedrock-直连迁移)。
+> 安装和快速配置 → [README 快速开始](../README.md#配置-claude-code)
 
 ---
 
@@ -92,7 +48,7 @@ Claude Code 内部使用 block-level `cache_control`，通过 LiteLLM → Bedroc
 
 **Bedrock 原生支持**（[AWS 文档](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)）：
 - 所有 Claude 模型，最多 4 个 cache checkpoint
-- 默认 5 分钟 TTL（Opus 4.5/Sonnet 4.5/Haiku 4.5 支持 1 小时 TTL）
+- Claude Code 固定使用 5 分钟 TTL（不可修改），Bedrock 对部分模型（Opus 4.5/Sonnet 4.5/Haiku 4.5）支持延长到 1 小时
 - Cache read = 基础 input 的 10%，cache write = 125%
 
 ---
@@ -210,30 +166,16 @@ source ~/.zshrc
 
 ## VS Code / Cursor 扩展
 
-> ⚠️ VS Code 扩展**没有** `apiBaseUrl` 或 `apiKey` 设置项。以下方式均**不能**配置 API 端点：
-> - ❌ `claudeCode.apiBaseUrl` / `claudeCode.apiKey` — 不存在
-> - ❌ `terminal.integrated.env.osx` — 只影响终端，扩展是独立进程
+> ⚠️ **VS Code 扩展目前不支持通过 LiteLLM 代理连接**，待官方适配。以下为已知限制：
+> - ❌ `claudeCode.apiBaseUrl` / `claudeCode.apiKey` — 设置项不存在
+> - ❌ `terminal.integrated.env.osx` — 只影响终端，扩展面板是独立进程
 > - ❌ `.vscode/settings.json` — 扩展不从这里读 API 配置
-
-**唯一有效的方式**：`~/.claude/settings.json`（全局）或项目根目录 `.claude/settings.json`（项目级）。
-
-VS Code 侧只需补充：
-
-```json
-{
-  "claudeCode.disableLoginPrompt": true,
-  "claudeCode.selectedModel": "claude-sonnet-4-6"
-}
-```
-
-| 设置 | 作用 |
-|------|------|
-| `disableLoginPrompt` | 跳过 Anthropic 登录（第三方 provider **必须开启**） |
-| `selectedModel` | 默认模型，也可用 `/model` 切换 |
-
-> 配置优先级：`~/.claude/settings.json`（最高）→ VS Code 设置 → Shell 环境变量（最低，但会触发 AWS 检测）
 >
-> 官方文档：https://code.claude.com/docs/en/vs-code
+> **CLI 可正常使用**。VS Code 扩展需等待 Anthropic 官方支持第三方 API endpoint 配置。
+
+如果你仍想尝试（可能在未来版本生效）：
+
+`~/.claude/settings.json`（全局）或项目根目录 `.claude/settings.json`（项目级）是唯一可能生效的配置路径。
 
 ---
 

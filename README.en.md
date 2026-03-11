@@ -44,26 +44,36 @@ cd serverless-litellm
 ./scripts/setup.sh
 ```
 
-### Configure Claude Code
+#### Configure Claude Code
 
-Write to `~/.claude/settings.json` — **replace 2 values**:
+**Install**:
 
-```json
+```bash
+# macOS / Linux / WSL (recommended)
+curl -fsSL https://claude.ai/install.sh | bash
+
+# npm
+npm install -g @anthropic-ai/claude-code
+```
+
+**Configure** — write to `~/.claude/settings.json`, **replace 2 values**:
+
+```jsonc
 {
   "env": {
-    "ANTHROPIC_BASE_URL": "https://<your-domain>",
-    "ANTHROPIC_API_KEY": "<your-litellm-key>"
+    "ANTHROPIC_BASE_URL": "https://<your-domain>",   // ← replace
+    "ANTHROPIC_API_KEY": "<your-litellm-key>"         // ← replace
   },
   "model": "claude-sonnet-4-6",
   "smallFastModel": "claude-haiku-4-5"
 }
 ```
 
-Verify: `claude --print "hello"`
+**Verify**: `claude --print "hello"`
 
 Switch models: `claude --model claude-opus-4-6` / `claude --model opus` / `claude --model claude-opus-4-1`
 
-> Full guide (templates, migration, caching, troubleshooting) → [docs/claude-code.md](docs/claude-code.md)
+> Full guide (optional params, migration, caching, troubleshooting) → [docs/claude-code.md](docs/claude-code.md)
 
 ## Documentation
 
