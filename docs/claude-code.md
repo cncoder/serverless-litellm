@@ -61,9 +61,6 @@ claude --print "hello world"
     "ANTHROPIC_API_KEY": "<YOUR_LITELLM_KEY>",
     "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "128000",
     "CLAUDE_CODE_EFFORT_LEVEL": "medium",
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50",
-    "CLAUDE_PACKAGE_MANAGER": "pnpm",
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "model": "claude-opus-4-6",
@@ -71,7 +68,7 @@ claude --print "hello world"
 }
 ```
 
-> 所有非 LiteLLM 相关的选项（`MAX_OUTPUT_TOKENS`、`EFFORT_LEVEL`、`PACKAGE_MANAGER` 等）可自由添加，不影响 LiteLLM 连接。
+> 所有非 LiteLLM 相关的选项（`MAX_OUTPUT_TOKENS`、`EFFORT_LEVEL`、`AGENT_TEAMS` 等）可自由添加，不影响 LiteLLM 连接。
 
 ---
 
@@ -154,7 +151,7 @@ Claude Code → ANTHROPIC_BASE_URL/v1/messages → LiteLLM → AWS Bedrock
 + "smallFastModel": "claude-haiku-4-5"
 ```
 
-其他字段（`MAX_OUTPUT_TOKENS`、`EFFORT_LEVEL`、`PACKAGE_MANAGER`、`TELEMETRY`、`AGENT_TEAMS` 等）**不影响**，保留即可。
+其他字段（`MAX_OUTPUT_TOKENS`、`EFFORT_LEVEL`、`AGENT_TEAMS` 等）**不影响**，保留即可。
 
 ---
 
