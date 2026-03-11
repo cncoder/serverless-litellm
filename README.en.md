@@ -108,3 +108,16 @@ Three-layer protection after deployment (ALB SG → WAF Header → path whitelis
 ## License
 
 MIT
+
+## References
+
+- [Claude Code Quickstart](https://code.claude.com/docs/en/quickstart)
+- [Claude Code LLM Gateway](https://code.claude.com/docs/en/llm-gateway)
+- [Anthropic Prompt Caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+- [AWS Bedrock Prompt Caching](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)
+- [AWS Bedrock Claude Model Parameters](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html)
+- [AWS Bedrock Cross-Region Inference](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html)
+- [LiteLLM Bedrock Integration](https://docs.litellm.ai/docs/providers/bedrock)
+- [LiteLLM + Claude API](https://docs.litellm.ai/docs/tutorials/claude_responses_api)
+- [EKS Fargate](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html)
+- [EKS IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)

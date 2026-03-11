@@ -108,3 +108,16 @@ AWS CLI v2 · Terraform ≥ 1.5 · kubectl · Helm 3 · envsubst
 ## License
 
 MIT
+
+## 参考链接
+
+- [Claude Code 快速开始](https://code.claude.com/docs/en/quickstart)
+- [Claude Code LLM Gateway 配置](https://code.claude.com/docs/en/llm-gateway)
+- [Anthropic Prompt Caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+- [AWS Bedrock Prompt Caching](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)
+- [AWS Bedrock Claude 模型参数](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html)
+- [AWS Bedrock Cross-Region Inference](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html)
+- [LiteLLM Bedrock 集成](https://docs.litellm.ai/docs/providers/bedrock)
+- [LiteLLM + Claude API](https://docs.litellm.ai/docs/tutorials/claude_responses_api)
+- [EKS Fargate 文档](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html)
+- [EKS IRSA 文档](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
