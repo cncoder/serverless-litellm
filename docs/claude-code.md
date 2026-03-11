@@ -173,7 +173,31 @@ source ~/.zshrc
 
 ### `eager_input_streaming` 报错
 
-→ 确保 LiteLLM ConfigMap 中 `drop_params: true`（本项目默认已启用）。
+```
+tools.0.custom.eager_input_streaming: Extra inputs are not permitted
+```
+
+→ 确保 LiteLLM ConfigMap 中 `drop_params: true`（本项目默认已启用）。这是顶层参数，`drop_params` 可以处理。
+
+### `input_examples` 报错
+
+```
+tools.3.custom.input_examples: Extra inputs are not permitted
+```
+
+→ `drop_params: true` **无法修复**此问题（嵌套在 `tools[]` 内部，不是顶层参数）。
+
+**解决方案**：升级 LiteLLM 至 **≥ v1.81.3**（[PR #19841](https://github.com/BerriAI/litellm/pull/19841)，2026-01-27 合入 main）。
+
+```bash
+# 检查当前版本
+curl -s https://<YOUR_LITELLM_DOMAIN>/health | jq '.version'
+
+# Docker 镜像升级（≥ v1.81.3 即可）
+ghcr.io/berriai/litellm:main-v1.82.1-nightly
+```
+
+> 参考：[GitHub Issue #16679](https://github.com/BerriAI/litellm/issues/16679) — Claude Code 发送 `input_examples` 字段，Bedrock 不接受。LiteLLM 新版会自动转换为 Bedrock 兼容的 header。
 
 ### 模型名 404
 
