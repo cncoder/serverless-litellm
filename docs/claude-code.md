@@ -38,18 +38,14 @@ Claude Code → ANTHROPIC_BASE_URL/v1/messages → LiteLLM → AWS Bedrock
 
 **自动生效 ✅** — 无需额外配置。
 
-Claude Code 内部使用 block-level `cache_control`，通过 LiteLLM → Bedrock 链路自动启用 prompt caching。
+Claude Code 内部自动使用 block-level `cache_control`，通过 LiteLLM → Bedrock 全链路透传，实测 **~90% input 成本节省**。
 
-| 请求 | cache_write | cache_read | 说明 |
-|------|-------------|------------|------|
-| 首次 | 2860 | 0 | 写入缓存 |
-| 重复前缀 | 0 | 2860 | **~90% input 成本节省** |
-| 不同 user msg | 0 | 2860 | system prefix 命中 |
-
-**Bedrock 原生支持**（[AWS 文档](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)）：
-- 所有 Claude 模型，最多 4 个 cache checkpoint
-- Claude Code 固定使用 5 分钟 TTL（不可修改），Bedrock 对部分模型（Opus 4.5/Sonnet 4.5/Haiku 4.5）支持延长到 1 小时
-- Cache read = 基础 input 的 10%，cache write = 125%
+**关键结论**：
+- Bedrock 原生支持 prompt caching，所有 Claude 模型，最多 4 个 cache checkpoint
+- Claude Code 固定使用 5 分钟 TTL（硬编码 `"type": "ephemeral"`，不可修改）
+- Bedrock 对部分模型支持延长到 1 小时，但需要客户端传 `"ttl": "1h"`，CC 目前不支持
+- `drop_params: true` 不会影响 cache_control（它是 block-level 参数，不是顶层参数）
+- Cache read 成本 = 基础 input × 10%，cache write = 基础 input × 125%
 
 ---
 
