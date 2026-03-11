@@ -150,16 +150,37 @@ Claude Code 内部使用 block-level `cache_control`，通过 LiteLLM → Bedroc
 
 ## Troubleshooting
 
-**CC 仍走 Bedrock 直连**（`400 The provided model identifier is invalid`）：
-```bash
-grep -E 'BEDROCK|AWS_REGION|ANTHROPIC_MODEL' ~/.claude/settings.json
-```
-→ 删除匹配的字段。详见下方「从 Bedrock 直连迁移」。
+### CC 仍走 Bedrock 直连（`400 The provided model identifier is invalid`）
 
-**`eager_input_streaming` 报错**：
+Claude Code 会**自动检测 AWS 环境**。如果检测到以下任意一项，它会绕过 `ANTHROPIC_BASE_URL` 直连 Bedrock：
+
+**排查清单**（按优先级检查）：
+
+```bash
+# 1. 检查 shell 环境变量（最常见！）
+echo $CLAUDE_CODE_USE_BEDROCK
+echo $AWS_REGION
+
+# 2. 检查 shell 配置文件（.zshrc / .bashrc / .bash_profile）
+grep -n 'CLAUDE_CODE_USE_BEDROCK\|AWS_REGION' ~/.zshrc ~/.bashrc ~/.bash_profile 2>/dev/null
+
+# 3. 检查 settings.json
+grep -E 'BEDROCK|AWS_REGION|ANTHROPIC_MODEL' ~/.claude/settings.json
+
+# 4. 检查 VS Code 设置
+grep -E 'BEDROCK|AWS_REGION' ~/Library/Application\ Support/Code/User/settings.json 2>/dev/null
+```
+
+**解决**：删除所有匹配项，然后 `source ~/.zshrc` + 重启 VS Code。详见下方「从 Bedrock 直连迁移」。
+
+> ⚠️ 很多用户在 `.zshrc` 中 `export CLAUDE_CODE_USE_BEDROCK=1` 后忘了删，这会覆盖所有其他配置。
+
+### `eager_input_streaming` 报错
+
 → 确保 LiteLLM ConfigMap 中 `drop_params: true`（本项目默认已启用）。
 
-**模型名 404**：
+### 模型名 404
+
 → 确认模型名在 [models.md](models.md) 列表中。如需新增别名，在 ConfigMap `model_list` 中添加条目。
 
 > 更多场景 → [troubleshooting.md](troubleshooting.md)
@@ -178,9 +199,15 @@ grep -E 'BEDROCK|AWS_REGION|ANTHROPIC_MODEL' ~/.claude/settings.json
 | `CLAUDE_CODE_SUBAGENT_MODEL` | 同上 |
 | `CLAUDE_CODE_SMALL_FAST_MODEL` | 同上（改用顶层 `smallFastModel`）|
 
-### ⚠️ settings.json `env` 优先级高于 shell `export`
+### ⚠️ 三个地方都要清理
 
-即使你在终端 `export ANTHROPIC_BASE_URL=...`，如果 settings.json 里有 `CLAUDE_CODE_USE_BEDROCK=1`，CC 仍走 Bedrock。**必须从 settings.json 中删除冲突字段**。
+| 位置 | 检查命令 | 说明 |
+|------|---------|------|
+| **Shell 配置** | `grep -n BEDROCK ~/.zshrc ~/.bashrc` | `.zshrc` 里的 `export` 最容易被遗忘 |
+| **settings.json** | `grep BEDROCK ~/.claude/settings.json` | CC 专属配置文件 |
+| **VS Code 设置** | `grep BEDROCK ~/Library/.../settings.json` | `claudeCode.environmentVariables` |
+
+> Shell `export` 和 settings.json `env` **同时生效时，settings.json 优先**。但 shell 变量仍会被 CC 检测到用于 AWS 环境判断。**两边都要清理。**
 
 ### 迁移 Diff
 
