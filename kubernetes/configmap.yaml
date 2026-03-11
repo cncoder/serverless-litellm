@@ -3,209 +3,204 @@ kind: ConfigMap
 metadata:
   name: litellm-config
   namespace: litellm
-  labels:
-    app: litellm
 data:
   config.yaml: |
-    # ====================================================================
-    # LiteLLM 配置文件 - AWS Bedrock Claude 模型代理
-    # ====================================================================
-
-    # ====================================================================
-    # 模型配置
-    # ====================================================================
-    model_list:
-      # ------------------------------------------------------------------
-      # Claude Opus 4.6 模型组 - 最强旗舰模型
-      # ------------------------------------------------------------------
-      - model_name: claude-opus-4-6-us
-        litellm_params:
-          model: bedrock/us.anthropic.claude-opus-4-6-v1
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-opus-4-6-us
-
-      - model_name: claude-opus-4-6-global
-        litellm_params:
-          model: bedrock/global.anthropic.claude-opus-4-6-v1
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-opus-4-6-global
-
-      - model_name: claude-opus-4-5
-        litellm_params:
-          model: bedrock/global.anthropic.claude-opus-4-5-20251101-v1:0
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-opus-4-5
-
-      # ------------------------------------------------------------------
-      # Claude Sonnet 4.6 模型组 - 最新 Sonnet 系列
-      # ------------------------------------------------------------------
-      - model_name: claude-sonnet-4-6-us
-        litellm_params:
-          model: bedrock/us.anthropic.claude-sonnet-4-6
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-sonnet-4-6-us
-
-      - model_name: claude-sonnet-4-6-global
-        litellm_params:
-          model: bedrock/global.anthropic.claude-sonnet-4-6
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-sonnet-4-6-global
-
-      # Claude Code 默认模型别名（标准 Anthropic 模型名，兼容 Claude Code / SDK）
-      - model_name: claude-opus-4-6
-        litellm_params:
-          model: bedrock/us.anthropic.claude-opus-4-6-v1
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-opus-4-6
-
-      - model_name: claude-sonnet-4-6
-        litellm_params:
-          model: bedrock/us.anthropic.claude-sonnet-4-6
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-sonnet-4-6
-
-      - model_name: claude-haiku-4-5-20251001
-        litellm_params:
-          model: bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-haiku-4-5-20251001
-
-      # ------------------------------------------------------------------
-      # Claude Sonnet 4.5 模型组 - 平衡性能与成本
-      # ------------------------------------------------------------------
-      - model_name: claude-sonnet-4-5
-        litellm_params:
-          model: bedrock/global.anthropic.claude-sonnet-4-5-20250929-v1:0
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-sonnet-4-5
-
-      # ------------------------------------------------------------------
-      # Claude Sonnet 3.x 模型组 - 经典稳定版本
-      # ------------------------------------------------------------------
-      - model_name: claude-sonnet-3-7
-        litellm_params:
-          model: bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-sonnet-3-7
-
-      - model_name: claude-sonnet-3-5
-        litellm_params:
-          model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-sonnet-3-5
-
-      # ------------------------------------------------------------------
-      # Claude Haiku 4.5 模型组 - 快速高效模型
-      # ------------------------------------------------------------------
-      - model_name: claude-haiku-4-5
-        litellm_params:
-          model: bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0
-          aws_region_name: us-west-2
-        model_info:
-          id: claude-haiku-4-5
-
-      # ------------------------------------------------------------------
-      # 通配符路由 - 支持所有 Bedrock 模型
-      # ------------------------------------------------------------------
-      - model_name: bedrock/*
-        litellm_params:
-          model: bedrock/*
-          aws_region_name: us-west-2
-        model_info:
-          id: bedrock-wildcard
-
-    # ====================================================================
-    # 路由器配置
-    # ====================================================================
-    router_settings:
-      routing_strategy: simple-shuffle           # 简单随机负载均衡
-      enable_pre_call_checks: true               # 启用调用前健康检查
-      allowed_fails: 3                           # 允许失败 3 次后熔断
-      cooldown_time: 60                          # 熔断后冷却时间 60 秒
-      num_retries: 2                             # 失败重试 2 次
-      timeout: 600                               # 请求超时 600 秒
-
-    # ====================================================================
-    # 降级链配置 - 模型故障时自动切换
-    # ====================================================================
-    litellm_settings:
-      # 参数兼容性配置
-      drop_params: true                          # 自动丢弃不支持的参数（解决 eager_input_streaming 等未知参数报错）
-
-      # Pass-through 端点 - 启用 /bedrock, /anthropic, /vertex_ai 透传
-      enable_passthrough_endpoints: true
-
-      # 重试和超时配置
-      num_retries: 3                             # 全局重试次数
-      request_timeout: 600                       # 全局请求超时
-
-      # 遥测和日志配置
-      telemetry: false                           # 禁用遥测
-      success_callback: []                       # 成功回调为空
-      failure_callback: []                       # 失败回调为空
-      log_raw_request_response: true             # 记录原始请求响应
-      turn_off_message_logging: false            # 不关闭消息日志
-      json_logs: true                            # 使用 JSON 格式日志
-
-      # Prometheus 监控回调
-      callbacks:
-        - prometheus
-
-      # 降级链定义
-      fallbacks:
-        # Opus 4.6 US → Opus 4.6 Global
-        - claude-opus-4-6-us:
-            - claude-opus-4-6-global
-
-        # Opus 4.6 Global → Opus 4.5
-        - claude-opus-4-6-global:
-            - claude-opus-4-5
-
-        # Opus 4.5 → Sonnet 4.6 US
-        - claude-opus-4-5:
-            - claude-sonnet-4-6-us
-
-        # Sonnet 4.6 US → Sonnet 4.6 Global
-        - claude-sonnet-4-6-us:
-            - claude-sonnet-4-6-global
-
-        # Sonnet 4.6 Global → Sonnet 4.5
-        - claude-sonnet-4-6-global:
-            - claude-sonnet-4-5
-
-        # Sonnet 4.5 → Sonnet 3.7
-        - claude-sonnet-4-5:
-            - claude-sonnet-3-7
-
-        # Sonnet 3.7 → Sonnet 3.5
-        - claude-sonnet-3-7:
-            - claude-sonnet-3-5
-
-        # Haiku 4.5 → Sonnet 3.5
-        - claude-haiku-4-5:
-            - claude-sonnet-3-5
-
-    # ====================================================================
-    # 模型别名 - Claude Code 内部可能使用带日期后缀的模型名
-    # ====================================================================
-    model_group_alias:
-      claude-haiku-4-5-20251001: claude-haiku-4-5
-      claude-sonnet-4-6-20250514: claude-sonnet-4-6
-
-    # ====================================================================
-    # 通用配置 - 从环境变量读取敏感信息
-    # ====================================================================
     general_settings:
-      master_key: os.environ/LITELLM_MASTER_KEY           # 主密钥
-      database_url: os.environ/DATABASE_URL               # PostgreSQL 连接
+      database_url: os.environ/DATABASE_URL
+      master_key: os.environ/LITELLM_MASTER_KEY
+    litellm_settings:
+      callbacks:
+      - prometheus
+      drop_params: true
+      enable_passthrough_endpoints: true
+      failure_callback: []
+      fallbacks:
+      - claude-opus-4-6-us:
+        - claude-opus-4-6-global
+      - claude-opus-4-6-global:
+        - claude-opus-4-5
+      - claude-opus-4-5:
+        - claude-sonnet-4-6-us
+      - claude-sonnet-4-6-us:
+        - claude-sonnet-4-6-global
+      - claude-sonnet-4-6-global:
+        - claude-sonnet-4-5
+      - claude-sonnet-4-5:
+        - claude-sonnet-3-7
+      - claude-sonnet-3-7:
+        - claude-sonnet-3-5
+      - claude-haiku-4-5:
+        - claude-sonnet-3-5
+      json_logs: true
+      log_raw_request_response: true
+      model_group_alias:
+        claude-haiku-4-5-20241022: claude-haiku-4-5
+        claude-opus-4-5-20251101: claude-opus-4-5
+        claude-opus-4-6-20250915: claude-opus-4-6
+        claude-opus-4-6-20250915-v1: claude-opus-4-6
+        claude-sonnet-3-5-20241022: claude-sonnet-3-5
+        claude-sonnet-3-7-20250219: claude-sonnet-3-7
+        claude-sonnet-4-5-20250929: claude-sonnet-4-5
+        claude-sonnet-4-6-20250514: claude-sonnet-4-6
+        claude-sonnet-4-6-20250514-v1: claude-sonnet-4-6
+        global.anthropic.claude-haiku-4-5-20251001-v1:0: claude-haiku-4-5
+        global.anthropic.claude-opus-4-5-20251101-v1:0: claude-opus-4-5
+        global.anthropic.claude-opus-4-6-v1: claude-opus-4-6
+        global.anthropic.claude-sonnet-4-5-20250929-v1:0: claude-sonnet-4-5
+        global.anthropic.claude-sonnet-4-6: claude-sonnet-4-6
+        haiku: claude-haiku-4-5
+        opus: claude-opus-4-6
+        sonnet: claude-sonnet-4-6
+        us.anthropic.claude-opus-4-6-v1: claude-opus-4-6
+        us.anthropic.claude-sonnet-4-6: claude-sonnet-4-6
+      num_retries: 3
+      request_timeout: 600
+      success_callback: []
+      telemetry: false
+      turn_off_message_logging: false
+    model_list:
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-opus-4-6-v1
+      model_info:
+        id: claude-opus-4-6-us
+      model_name: claude-opus-4-6-us
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-opus-4-6-v1
+      model_info:
+        id: claude-opus-4-6-global
+      model_name: claude-opus-4-6-global
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-opus-4-5-20251101-v1:0
+      model_info:
+        id: claude-opus-4-5
+      model_name: claude-opus-4-5
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-sonnet-4-6
+      model_info:
+        id: claude-sonnet-4-6-us
+      model_name: claude-sonnet-4-6-us
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-sonnet-4-6
+      model_info:
+        id: claude-sonnet-4-6-global
+      model_name: claude-sonnet-4-6-global
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-opus-4-6-v1
+      model_info:
+        id: claude-opus-4-6
+      model_name: claude-opus-4-6
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-sonnet-4-6
+      model_info:
+        id: claude-sonnet-4-6
+      model_name: claude-sonnet-4-6
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0
+      model_info:
+        id: claude-haiku-4-5-20251001
+      model_name: claude-haiku-4-5-20251001
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-sonnet-4-5-20250929-v1:0
+      model_info:
+        id: claude-sonnet-4-5
+      model_name: claude-sonnet-4-5
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
+      model_info:
+        id: claude-sonnet-3-7
+      model_name: claude-sonnet-3-7
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
+      model_info:
+        id: claude-sonnet-3-5
+      model_name: claude-sonnet-3-5
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0
+      model_info:
+        id: claude-haiku-4-5
+      model_name: claude-haiku-4-5
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/*
+      model_info:
+        id: bedrock-wildcard
+      model_name: bedrock/*
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-opus-4-6-v1
+      model_info:
+        id: alias-claude-opus-4-6-20250915
+      model_name: claude-opus-4-6-20250915
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-sonnet-4-6
+      model_info:
+        id: alias-claude-sonnet-4-6-20250514
+      model_name: claude-sonnet-4-6-20250514
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0
+      model_info:
+        id: alias-claude-haiku-4-5-20241022
+      model_name: claude-haiku-4-5-20241022
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-sonnet-4-5-20250929-v1:0
+      model_info:
+        id: alias-claude-sonnet-4-5-20250929
+      model_name: claude-sonnet-4-5-20250929
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-opus-4-5-20251101-v1:0
+      model_info:
+        id: alias-claude-opus-4-5-20251101
+      model_name: claude-opus-4-5-20251101
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
+      model_info:
+        id: alias-claude-sonnet-3-7-20250219
+      model_name: claude-sonnet-3-7-20250219
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
+      model_info:
+        id: alias-claude-sonnet-3-5-20241022
+      model_name: claude-sonnet-3-5-20241022
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-opus-4-6-v1
+      model_info:
+        id: alias-opus
+      model_name: opus
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-sonnet-4-6
+      model_info:
+        id: alias-sonnet
+      model_name: sonnet
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0
+      model_info:
+        id: alias-haiku
+      model_name: haiku
+    router_settings:
+      allowed_fails: 3
+      cooldown_time: 60
+      enable_pre_call_checks: true
+      num_retries: 2
+      routing_strategy: simple-shuffle
+      timeout: 600
