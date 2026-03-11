@@ -52,41 +52,52 @@ claude --print "hello world"
 
 ## VS Code / Cursor 集成
 
-Claude Code 的 VS Code 扩展使用不同的配置路径。需要在 VS Code 设置中配置：
+VS Code 扩展**共享** `~/.claude/settings.json`，不需要单独配置 API 地址和 Key。
 
-### 用户级设置（全局生效）
+只需在 VS Code 设置中补充两项：
+
+### Step 1：VS Code 设置
 
 打开 VS Code → `Cmd+Shift+P` → `Preferences: Open User Settings (JSON)`，添加：
 
 ```json
 {
-  "claudeCode.apiBaseUrl": "https://<YOUR_LITELLM_DOMAIN>",
-  "claudeCode.apiKey": "<YOUR_LITELLM_KEY>",
+  "claudeCode.disableLoginPrompt": true,
   "claudeCode.selectedModel": "claude-sonnet-4-6"
 }
 ```
 
-### 项目级设置（仅当前项目）
+- `disableLoginPrompt` — 跳过 Anthropic 登录提示（使用第三方 provider 必须开启）
+- `selectedModel` — 新对话默认模型（也可以在对话中用 `/model` 切换）
 
-在项目根目录创建 `.vscode/settings.json`：
+### Step 2：确认 `~/.claude/settings.json`
 
-```json
-{
-  "claudeCode.apiBaseUrl": "https://<YOUR_LITELLM_DOMAIN>",
-  "claudeCode.apiKey": "<YOUR_LITELLM_KEY>",
-  "claudeCode.selectedModel": "claude-opus-4-6"
-}
+确保上方「配置」段落中的 `~/.claude/settings.json` 已正确配置。VS Code 扩展和 CLI **共享这个文件**。
+
+### ⚠️ 常见问题：扩展仍然走 Bedrock 直连
+
+如果机器上配置了 AWS CLI（`~/.aws/credentials`），扩展可能**自动检测到 AWS 环境并走 Bedrock 直连**，忽略 LiteLLM 配置。
+
+**排查步骤**：
+```bash
+# 检查是否有 Bedrock 相关残留配置
+grep -E 'BEDROCK|AWS_REGION|ANTHROPIC_MODEL' ~/.claude/settings.json
+
+# 检查 VS Code 设置是否有冲突
+grep -rE 'BEDROCK|AWS_REGION' ~/Library/Application\ Support/Code/User/settings.json
 ```
+
+**解决**：从 `~/.claude/settings.json` 中删除 `CLAUDE_CODE_USE_BEDROCK`、`AWS_REGION`、`ANTHROPIC_MODEL` 等字段。详见下方「从 Bedrock 直连迁移」。
 
 ### 配置优先级
 
-| 优先级 | 位置 | 说明 |
+| 优先级 | 位置 | 作用 |
 |--------|------|------|
-| 1（最高） | `.vscode/settings.json` | 项目级，可按项目选模型 |
-| 2 | VS Code 用户设置 | 全局默认 |
-| 3 | `~/.claude/settings.json` | CLI 配置（VS Code 扩展不读） |
+| 1（最高） | `~/.claude/settings.json` 的 `env` | API 地址、Key、环境变量 |
+| 2 | VS Code `claudeCode.*` 设置 | 模型选择、UI 行为 |
+| 3 | Shell 环境变量 | 被 settings.json 覆盖 |
 
-> ⚠️ **CLI 和 VS Code 扩展配置互不影响**。CLI 用 `~/.claude/settings.json`，VS Code 扩展用 VS Code 自己的设置。两边都要配。
+> **关键**：`claudeCode.apiBaseUrl` 和 `claudeCode.apiKey` 这两个 VS Code 设置**不存在**。API 配置只能通过 `~/.claude/settings.json` 的 `env` 字段设置。
 
 ---
 
