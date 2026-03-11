@@ -149,6 +149,44 @@ echo "Done! Run: claude --print 'hello'"
 
 ---
 
+## 备选：Bedrock Pass-through 模式
+
+如果 Unified Endpoint 不满足需求（如需要 Bedrock 原生 API 兼容性），可使用 pass-through 模式：
+
+**前置条件**：ConfigMap 中 `litellm_settings.enable_passthrough_endpoints` 设为 `true`，Ingress 包含 `/bedrock` 路由。
+
+```bash
+export ANTHROPIC_BEDROCK_BASE_URL="https://<YOUR_LITELLM_DOMAIN>/bedrock"
+export CLAUDE_CODE_SKIP_BEDROCK_AUTH=1
+export CLAUDE_CODE_USE_BEDROCK=1
+export ANTHROPIC_API_KEY="<YOUR_LITELLM_KEY>"
+
+claude --print "hello"
+```
+
+持久化（`~/.claude.json`）：
+
+```json
+{
+  "primaryProvider": "bedrock",
+  "bedrockBaseUrl": "https://<YOUR_LITELLM_DOMAIN>/bedrock",
+  "anthropicApiKey": "<YOUR_LITELLM_KEY>"
+}
+```
+
+同时在 `~/.bashrc` 中添加：
+
+```bash
+export CLAUDE_CODE_SKIP_BEDROCK_AUTH=1
+export CLAUDE_CODE_USE_BEDROCK=1
+```
+
+```
+Claude Code → Bedrock SDK → /bedrock/{region}/model/{model}/... → LiteLLM → AWS Bedrock
+```
+
+---
+
 ## Troubleshooting
 
 ### `eager_input_streaming` 报错
