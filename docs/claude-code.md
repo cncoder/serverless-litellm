@@ -21,20 +21,9 @@ irm https://claude.ai/install.ps1 | iex
 
 ---
 
-## 方式一：Unified Endpoint（推荐新用户）
+## 配置（settings.json 一键模板）
 
-适用于**首次接入**或**没有现有 Bedrock 配置**的用户。配置最简单，只需 2 个变量。
-
-### export 方式
-
-```bash
-export ANTHROPIC_BASE_URL="https://<YOUR_LITELLM_DOMAIN>"
-export ANTHROPIC_API_KEY="<YOUR_LITELLM_KEY>"
-
-claude --print "hello"
-```
-
-### settings.json 配置（推荐）
+将以下内容写入 `~/.claude/settings.json`，**只需替换 2 个值**即可使用：
 
 ```json
 {
@@ -43,129 +32,139 @@ claude --print "hello"
     "ANTHROPIC_BASE_URL": "https://<YOUR_LITELLM_DOMAIN>",
     "ANTHROPIC_API_KEY": "<YOUR_LITELLM_KEY>"
   },
-  "model": "claude-sonnet-4-6"
+  "model": "claude-sonnet-4-6",
+  "smallFastModel": "claude-haiku-4-5"
 }
 ```
 
-### 工作原理
+写好后验证：
+
+```bash
+claude --print "hello world"
+```
+
+就这么简单。不需要 `CLAUDE_CODE_USE_BEDROCK`、`AWS_REGION`、`AWS_ACCESS_KEY_ID` 等任何 AWS 相关变量。
+
+---
+
+## 完整配置模板（含常用选项）
+
+如果需要更多定制，以下是包含常用选项的完整模板：
+
+```json
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "respectGitignore": true,
+  "cleanupPeriodDays": 30,
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://<YOUR_LITELLM_DOMAIN>",
+    "ANTHROPIC_API_KEY": "<YOUR_LITELLM_KEY>",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "128000",
+    "CLAUDE_CODE_EFFORT_LEVEL": "medium",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50",
+    "CLAUDE_PACKAGE_MANAGER": "pnpm",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "model": "claude-opus-4-6",
+  "smallFastModel": "claude-haiku-4-5"
+}
+```
+
+> 所有非 LiteLLM 相关的选项（`MAX_OUTPUT_TOKENS`、`EFFORT_LEVEL`、`PACKAGE_MANAGER` 等）可自由添加，不影响 LiteLLM 连接。
+
+---
+
+## 工作原理
 
 ```
 Claude Code → ANTHROPIC_BASE_URL/v1/messages → LiteLLM → AWS Bedrock
 ```
 
-### ⚠️ 从 Bedrock 直连迁移时必须去掉的配置
-
-如果你之前直接对接 Bedrock（非 LiteLLM），`~/.claude/settings.json` 中可能有以下字段，**必须删除**，否则 Claude Code 会绕过 LiteLLM 继续走 Bedrock 直连：
-
-| 必须删除的字段 | 原因 |
-|--------------|------|
-| `CLAUDE_CODE_USE_BEDROCK` | 强制 Claude Code 使用 Bedrock SDK，忽略 `ANTHROPIC_BASE_URL` |
-| `AWS_REGION` | Claude Code 检测到 AWS 环境后会自动走 Bedrock |
-| `ANTHROPIC_MODEL` | Bedrock 模型 ID 格式（如 `us.anthropic.claude-opus-4-6-v1`），LiteLLM 不识别 |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | 同上，Bedrock 格式的子代理模型 ID |
-
-其他字段（如 `CLAUDE_CODE_MAX_OUTPUT_TOKENS`、`CLAUDE_CODE_EFFORT_LEVEL`、`CLAUDE_PACKAGE_MANAGER` 等）**不影响**，可以保留。
+- Claude Code 使用 Anthropic Messages API 格式发请求
+- LiteLLM 转换并路由到 Bedrock 后端
+- 不需要真实 Anthropic API Key，LiteLLM Master Key 即可
+- 服务端 `drop_params: true` 自动处理不兼容参数（如 `eager_input_streaming`）
 
 ---
 
-## 方式二：Bedrock Pass-through（推荐已有 Bedrock 环境）
+## 可用模型
 
-适用于**已在使用 Bedrock 直连**的用户。改动最小，保留现有 `CLAUDE_CODE_USE_BEDROCK=1`，只需加 2 个变量。
+以下模型名称均已在 LiteLLM 中注册，可直接用于 `model` 字段或 `--model` 参数：
 
-**前置条件**：LiteLLM ConfigMap 中 `litellm_settings.enable_passthrough_endpoints` 设为 `true`，Ingress 包含 `/bedrock` 路由。
+### 推荐名称
 
-### export 方式
+| 模型参数 | 说明 |
+|---------|------|
+| `claude-opus-4-6` | Opus 4.6（最强） |
+| `claude-sonnet-4-6` | **Sonnet 4.6（推荐默认）** |
+| `claude-haiku-4-5` | Haiku 4.5（最快最便宜） |
+| `claude-opus-4-5` | Opus 4.5 |
+| `claude-sonnet-4-5` | Sonnet 4.5 |
+| `claude-sonnet-3-7` | Sonnet 3.7 |
+| `claude-sonnet-3-5` | Sonnet 3.5 |
 
-```bash
-export ANTHROPIC_BEDROCK_BASE_URL="https://<YOUR_LITELLM_DOMAIN>/bedrock"
-export CLAUDE_CODE_SKIP_BEDROCK_AUTH=1
-export CLAUDE_CODE_USE_BEDROCK=1
-export ANTHROPIC_API_KEY="<YOUR_LITELLM_KEY>"
+### 兼容的别名
 
-claude --print "hello"
-```
+以下格式也可以使用（LiteLLM 自动映射）：
 
-### settings.json 配置（推荐）
-
-```json
-{
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "env": {
-    "ANTHROPIC_BEDROCK_BASE_URL": "https://<YOUR_LITELLM_DOMAIN>/bedrock",
-    "ANTHROPIC_API_KEY": "<YOUR_LITELLM_KEY>",
-    "CLAUDE_CODE_USE_BEDROCK": "1",
-    "CLAUDE_CODE_SKIP_BEDROCK_AUTH": "1"
-  },
-  "model": "claude-sonnet-4-6"
-}
-```
-
-### 工作原理
-
-```
-Claude Code → Bedrock SDK → /bedrock/{region}/model/{model}/... → LiteLLM → AWS Bedrock
-```
-
-### ⚠️ 从 Bedrock 直连迁移时必须去掉的配置
-
-| 必须删除的字段 | 原因 |
-|--------------|------|
-| `ANTHROPIC_MODEL` | Bedrock 模型 ID 格式（如 `us.anthropic.claude-opus-4-6-v1`），LiteLLM 使用简短名称（如 `claude-sonnet-4-6`）|
-| `CLAUDE_CODE_SUBAGENT_MODEL` | 同上 |
-| `AWS_REGION` | 可能干扰 LiteLLM 路由，建议删除 |
-
-可以保留的字段：`CLAUDE_CODE_USE_BEDROCK`（方式二需要）、`CLAUDE_CODE_MAX_OUTPUT_TOKENS`、`CLAUDE_CODE_EFFORT_LEVEL` 等。
-
----
-
-## 三种接入方式对比
-
-| | Bedrock 直连 | 方式一 (Unified) | 方式二 (Pass-through) |
-|---|---|---|---|
-| 链路 | CC → Bedrock | CC → LiteLLM → Bedrock | CC → LiteLLM → Bedrock |
-| 需要 AWS 凭证 | ✅ | ❌ | ❌ |
-| 需要 Anthropic API Key | ❌ | ❌（用 LiteLLM Key） | ❌（用 LiteLLM Key） |
-| `CLAUDE_CODE_USE_BEDROCK` | `1` | **删除** | `1`（保留） |
-| `AWS_REGION` | 需要 | **删除** | **删除** |
-| `ANTHROPIC_MODEL` | Bedrock 格式 | **删除** | **删除** |
-| 配置改动量 | — | 删 4 加 2 | 删 2 加 2 |
-| 适合 | 有 IAM 权限 | 新用户 | **已有 Bedrock 配置** |
-
----
-
-## 指定模型
-
-```bash
-# 默认模型（claude-sonnet-4-6）
-claude
-
-# 指定其他模型
-claude --model claude-opus-4-6      # Opus 4.6
-claude --model claude-sonnet-4-5    # Sonnet 4.5
-claude --model claude-haiku-4-5     # Haiku 4.5（快速）
-```
-
-会话内切换：
-
-```
-/model claude-opus-4-6
-```
-
----
-
-## 可用模型列表
-
-| 模型参数 | Bedrock 后端 | 说明 |
-|---------|------------|------|
-| `claude-sonnet-4-6` | `us.anthropic.claude-sonnet-4-6` | **默认**，最新 Sonnet |
-| `claude-opus-4-6` | `us.anthropic.claude-opus-4-6-v1` | Opus 4.6 |
-| `claude-opus-4-5` | `global.anthropic.claude-opus-4-5-*` | Opus 4.5 |
-| `claude-sonnet-4-5` | `global.anthropic.claude-sonnet-4-5-*` | Sonnet 4.5 |
-| `claude-haiku-4-5` | `global.anthropic.claude-haiku-4-5-*` | Haiku 4.5 |
-| `claude-sonnet-3-7` | `us.anthropic.claude-3-7-sonnet-*` | Sonnet 3.7 |
-| `claude-sonnet-3-5` | `us.anthropic.claude-3-5-sonnet-*` | Sonnet 3.5 |
+| 格式 | 示例 | 映射到 |
+|------|------|--------|
+| 短名 | `opus` / `sonnet` / `haiku` | 最新版本 |
+| 带日期后缀 | `claude-opus-4-6-20250915` | `claude-opus-4-6` |
+| Bedrock 格式 | `us.anthropic.claude-opus-4-6-v1` | `claude-opus-4-6` |
 
 > 完整列表：`curl -s https://<domain>/v1/models -H "Authorization: Bearer <key>" | jq '.data[].id'`
+
+---
+
+## 从 Bedrock 直连迁移
+
+如果你之前直接对接 Bedrock（非 LiteLLM），`~/.claude/settings.json` 中可能有以下字段会冲突：
+
+| 必须删除的字段 | 原因 |
+|--------------|------|
+| `CLAUDE_CODE_USE_BEDROCK` | 强制走 Bedrock SDK，忽略 `ANTHROPIC_BASE_URL` |
+| `AWS_REGION` | CC 检测到 AWS 环境会自动走 Bedrock |
+| `ANTHROPIC_MODEL` | Bedrock 模型 ID 格式，与 LiteLLM 模型名冲突 |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | 同上 |
+| `CLAUDE_CODE_SMALL_FAST_MODEL` | 同上（改用顶层 `smallFastModel`）|
+
+### ⚠️ 重要：settings.json 的 `env` 优先级高于 shell `export`
+
+即使你在终端 `export ANTHROPIC_BASE_URL=...`，如果 `settings.json` 里有 `CLAUDE_CODE_USE_BEDROCK=1`，CC 仍然走 Bedrock 直连。**必须从 settings.json 中删除冲突字段**。
+
+### 迁移前后对比
+
+```diff
+  "env": {
+-   "CLAUDE_CODE_USE_BEDROCK": "1",
+-   "AWS_REGION": "us-west-2",
+-   "ANTHROPIC_MODEL": "us.anthropic.claude-opus-4-6-v1",
+-   "CLAUDE_CODE_SUBAGENT_MODEL": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+-   "CLAUDE_CODE_SMALL_FAST_MODEL": "claude-haiku-4-5-20241022",
++   "ANTHROPIC_BASE_URL": "https://<YOUR_LITELLM_DOMAIN>",
++   "ANTHROPIC_API_KEY": "<YOUR_LITELLM_KEY>",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "128000",
+    "CLAUDE_CODE_EFFORT_LEVEL": "medium",
+    ...
+  },
+- "model": "us.anthropic.claude-sonnet-4-6",
++ "model": "claude-opus-4-6",
++ "smallFastModel": "claude-haiku-4-5"
+```
+
+其他字段（`MAX_OUTPUT_TOKENS`、`EFFORT_LEVEL`、`PACKAGE_MANAGER`、`TELEMETRY`、`AGENT_TEAMS` 等）**不影响**，保留即可。
+
+---
+
+## 关于 Prompt Caching
+
+Claude Code 自动管理 prompt caching。LiteLLM 会透传 `cache_control` 相关字段。
+
+> ⚠️ **当前限制**：Prompt caching 目前仅在 Anthropic API 直连和 Azure AI Foundry 上生效。AWS Bedrock 后端暂不支持（官方标注 "coming later"）。这意味着通过 LiteLLM → Bedrock 链路时，caching 字段会被接受但不会产生实际缓存效果。
+>
+> 参考：https://platform.claude.com/docs/en/build-with-claude/prompt-caching
 
 ---
 
@@ -182,13 +181,17 @@ curl -s https://<YOUR_LITELLM_DOMAIN>/v1/models \
 
 # 3. 测试 Claude Code
 claude --print "hello world"
+
+# 4. 指定模型测试
+claude --print --model claude-opus-4-6 "hello"
+claude --print --model claude-haiku-4-5 "hello"
 ```
 
 ---
 
 ## EC2 快速部署脚本
 
-在新 EC2 实例（Amazon Linux 2023）上一键安装 Claude Code 并配置 LiteLLM：
+在新 EC2 实例（Amazon Linux 2023）上一键安装并配置：
 
 ```bash
 # 替换以下变量
@@ -201,15 +204,26 @@ export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh"
 nvm install 22 && nvm use 22
 npm install -g @anthropic-ai/claude-code
 
-# 配置（方式一）
-cat >> ~/.bashrc << EOF
-export ANTHROPIC_BASE_URL="${LITELLM_URL}"
-export ANTHROPIC_API_KEY="${LITELLM_KEY}"
-export NVM_DIR="\$HOME/.nvm"
-[ -s "\$NVM_DIR/nvm.sh" ] && . "\$NVM_DIR/nvm.sh"
+# 写入 settings.json（唯一配置文件，无需 export）
+mkdir -p ~/.claude
+cat > ~/.claude/settings.json << EOF
+{
+  "\$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "ANTHROPIC_BASE_URL": "${LITELLM_URL}",
+    "ANTHROPIC_API_KEY": "${LITELLM_KEY}"
+  },
+  "model": "claude-sonnet-4-6",
+  "smallFastModel": "claude-haiku-4-5"
+}
 EOF
 
-source ~/.bashrc
+# 持久化 NVM
+cat >> ~/.bashrc << 'EOF'
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+EOF
+
 echo "Done! Run: claude --print 'hello'"
 ```
 
@@ -220,25 +234,17 @@ echo "Done! Run: claude --print 'hello'"
 ### Claude Code 仍然走 Bedrock 直连
 
 **症状**：
-
 ```
 API Error (claude-sonnet-4-6): 400 The provided model identifier is invalid.
-Try --model to switch to us.anthropic.claude-sonnet-4-5-20250929-v1:0.
 ```
-
-**原因**：`~/.claude/settings.json` 中的 `env` 字段优先级**高于** shell `export`。如果 settings.json 里有 `CLAUDE_CODE_USE_BEDROCK=1`，即使你 export 了 `ANTHROPIC_BASE_URL`，Claude Code 仍然走 Bedrock。
 
 **排查**：
-
 ```bash
-# 检查 settings.json
+# 检查 settings.json 中是否有 Bedrock 相关配置
 grep -E 'BEDROCK|AWS_REGION|ANTHROPIC_MODEL' ~/.claude/settings.json
-
-# 检查当前环境变量
-env | grep -iE 'ANTHROPIC|CLAUDE|BEDROCK|AWS'
 ```
 
-**解决**：按照上方「从 Bedrock 直连迁移时必须去掉的配置」表格，删除冲突字段。
+**解决**：删除 `CLAUDE_CODE_USE_BEDROCK`、`AWS_REGION`、`ANTHROPIC_MODEL` 等字段。详见上方「从 Bedrock 直连迁移」。
 
 ### `eager_input_streaming` 报错
 
@@ -246,9 +252,7 @@ env | grep -iE 'ANTHROPIC|CLAUDE|BEDROCK|AWS'
 litellm.BadRequestError: ... "eager_input_streaming" is not permitted
 ```
 
-**原因**：Claude Code SDK 发送了 `eager_input_streaming` 参数，Bedrock 不支持。
-
-**解决**：确保 ConfigMap 中 `litellm_settings.drop_params` 设为 `true`（本项目默认已启用）。
+**解决**：确保 LiteLLM ConfigMap 中 `litellm_settings.drop_params` 设为 `true`（本项目默认已启用）。
 
 ### 模型名不匹配 (404 / model not found)
 
@@ -256,22 +260,18 @@ litellm.BadRequestError: ... "eager_input_streaming" is not permitted
 Model "claude-haiku-4-5-20251001" not found
 ```
 
-**原因**：Claude Code 内部可能使用带日期后缀的模型名。
-
-**解决**：在 ConfigMap 中配置独立的 `model_name` 或 `model_group_alias` 映射（本项目已预配置）。
+**解决**：本项目已预配置所有常用模型名别名。如遇到未覆盖的名称，在 ConfigMap `model_list` 中添加对应条目。
 
 ### CloudFront 返回 504 Gateway Timeout
 
-**可能原因**：
-1. ALB 没有活跃的 Listener — 检查 `aws elbv2 describe-listeners`
-2. Target Group 中的 Pod 不健康 — 检查 `kubectl get pods -n litellm`
-3. 安全组未放行 CloudFront IP — ALB SG 需要包含 CloudFront 前缀列表
+检查：
+1. ALB 是否有活跃的 Listener：`aws elbv2 describe-listeners`
+2. Pod 是否健康：`kubectl get pods -n litellm`
+3. 安全组是否放行 CloudFront IP
 
 ### CloudFront 返回 404
 
-**原因**：CloudFront 的 `Host` header 与 Ingress 的 host 规则不匹配。
-
-**解决**：添加 `host: *` 的 Ingress 规则（本项目 `kubernetes/ingress-http.yaml` 已包含）。
+**解决**：确保 Ingress 包含 `host: *` 的规则（本项目 `kubernetes/ingress-http.yaml` 已包含）。
 
 ---
 
@@ -280,4 +280,4 @@ Model "claude-haiku-4-5-20251001" not found
 - [Claude Code 快速开始](https://code.claude.com/docs/en/quickstart)
 - [Claude Code LLM Gateway 配置](https://code.claude.com/docs/en/llm-gateway)
 - [LiteLLM + Claude API](https://docs.litellm.ai/docs/tutorials/claude_responses_api)
-- [LiteLLM Pass-through 端点](https://docs.litellm.ai/docs/pass_through/bedrock)
+- [Prompt Caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
