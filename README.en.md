@@ -10,7 +10,15 @@ Deploy LiteLLM proxy on AWS with one command. Give your team unified API Keys to
 Bedrock handles models & inference → LiteLLM handles people & cost → CloudFront handles security
 ```
 
-**Core capabilities**: Per-user API Keys · Real-time usage tracking · Auto fallback · OpenAI + Anthropic dual format · Per-key rate limits
+## Why You Need This
+
+| Pain Point | Solution |
+|------------|----------|
+| Every developer needs AWS credentials | Unified API Keys — per-user, per-user billing |
+| No control over model usage and costs | Per-key rate limits + real-time usage dashboard |
+| Want Claude Code but only have Bedrock | OpenAI + Anthropic dual format compatible |
+| Occasional model errors disrupt work | Auto fallback — switches to backup after 3 failures |
+| Want to save on Prompt Caching | Bedrock native support, ~90% input cost savings |
 
 ## Architecture
 
@@ -18,17 +26,15 @@ Bedrock handles models & inference → LiteLLM handles people & cost → CloudFr
   <img src="docs/architecture.svg" alt="Architecture" width="100%"/>
 </p>
 
-## Features
-
-- **Full Bedrock Claude lineup** — Opus 4.6/4.5/4.1, Sonnet 4.6/4.5/3.7/3.5, Haiku 4.5, wildcard routing `bedrock/*`
-- **Complete fallback chain** — Auto-switch to backup model after 3 failures
-- **Zero static credentials** — EKS IRSA (IAM Roles for Service Accounts)
-- **Serverless compute** — EKS Fargate, pay-per-use with no node management
-- **Prompt Caching** — Bedrock native support, auto-effective with Claude Code, ~90% input cost savings
-- **RDS PostgreSQL** — API Key management + Admin UI + usage tracking
-- **Optional security hardening** — WAF rate limiting + Cognito user auth
+> Detailed architecture → [docs/architecture.md](docs/architecture.md)
 
 ## Quick Start
+
+### Prerequisites
+
+AWS CLI v2 · Terraform ≥ 1.5 · kubectl · Helm 3 · envsubst
+
+### Deploy
 
 ```bash
 git clone https://github.com/cncoder/serverless-litellm.git
@@ -38,11 +44,7 @@ cd serverless-litellm
 ./scripts/setup.sh
 ```
 
-### Prerequisites
-
-AWS CLI v2 · Terraform ≥ 1.5 · kubectl · Helm 3 · envsubst
-
-## Configure Claude Code
+### Configure Claude Code
 
 Write to `~/.claude/settings.json` — **replace 2 values**:
 
@@ -63,37 +65,19 @@ Switch models: `claude --model claude-opus-4-6` / `claude --model opus` / `claud
 
 > Full guide (templates, migration, caching, troubleshooting) → [docs/claude-code.md](docs/claude-code.md)
 
-## Configure OpenClaw
-
-> [OpenClaw](https://github.com/openclaw/openclaw) integration → [docs/openclaw.md](docs/openclaw.md)
-
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
 | ⭐ [Claude Code Setup](docs/claude-code.md) | settings.json templates, model selection, migration |
-| ⭐ [Architecture](docs/architecture.md) | EKS, IRSA, Fargate, networking |
+| ⭐ [Architecture](docs/architecture.md) | Networking, security, compute layer |
 | [Available Models](docs/models.md) | Model list, fallback chains, routing |
 | [API Examples](docs/API_USAGE.md) | OpenAI SDK / Anthropic SDK / cURL |
-| [Manual Deploy](docs/manual-deploy.md) | Terraform variables, two-stage ACM |
+| [Manual Deploy](docs/manual-deploy.md) | Terraform variables, step-by-step deploy |
 | [Troubleshooting](docs/troubleshooting.md) | Real production experience |
-| [Testing Guide](docs/testing-guide.md) | Functional / performance / HA / security |
 | [Bedrock Monitoring](docs/bedrock-monitoring-guide.md) | Usage monitoring & cost analysis |
-
-## CloudFront + WAF Hardening
-
-Three-layer protection after deployment (ALB SG → WAF Header → path whitelist). See [skills/cloudfront-waf-hardening/SKILL.md](skills/cloudfront-waf-hardening/SKILL.md).
-
-## Timeout Configuration
-
-| Component | Value | Notes |
-|-----------|-------|-------|
-| CloudFront OriginReadTimeout | 60s | First-byte limit; streaming is NOT limited |
-| ALB Idle Timeout | 600s | Connection drops if idle beyond this |
-| LiteLLM request_timeout | 600s | Proxy-level timeout |
-| K8s Ingress idle_timeout | 600s | ALB Ingress annotation |
-
-> Claude Code uses streaming by default — not affected by CloudFront's 60s first-byte limit.
+| [Testing Guide](docs/testing-guide.md) | Functional / performance / HA / security |
+| [OpenClaw Integration](docs/openclaw.md) | OpenClaw agent framework setup |
 
 ## Directory Structure
 
@@ -113,11 +97,6 @@ MIT
 
 - [Claude Code Quickstart](https://code.claude.com/docs/en/quickstart)
 - [Claude Code LLM Gateway](https://code.claude.com/docs/en/llm-gateway)
-- [Anthropic Prompt Caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
 - [AWS Bedrock Prompt Caching](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)
-- [AWS Bedrock Claude Model Parameters](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html)
-- [AWS Bedrock Cross-Region Inference](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html)
 - [LiteLLM Bedrock Integration](https://docs.litellm.ai/docs/providers/bedrock)
-- [LiteLLM + Claude API](https://docs.litellm.ai/docs/tutorials/claude_responses_api)
-- [EKS Fargate](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html)
-- [EKS IRSA](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+- [AWS Bedrock Cross-Region Inference](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html)

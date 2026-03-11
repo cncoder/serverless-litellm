@@ -10,7 +10,15 @@
 Bedrock 管模型和推理 → LiteLLM 管人和成本 → CloudFront 管安全
 ```
 
-**核心能力**：per-user API Key · 实时用量拆账 · 自动 Fallback · OpenAI + Anthropic 双格式 · per-key 限速限额
+## 为什么需要它
+
+| 痛点 | 方案 |
+|------|------|
+| 每个开发者都要配 AWS 凭证 | 统一 API Key，按人分配、按人计费 |
+| 无法控制模型用量和成本 | per-key 限速限额 + 实时用量看板 |
+| 想用 Claude Code 但只有 Bedrock | OpenAI + Anthropic 双格式兼容 |
+| 模型偶尔报错影响开发 | 自动 Fallback，3 次失败切备用模型 |
+| Prompt Caching 想省钱 | Bedrock 原生支持，~90% input 成本节省 |
 
 ## 架构
 
@@ -18,17 +26,15 @@ Bedrock 管模型和推理 → LiteLLM 管人和成本 → CloudFront 管安全
   <img src="docs/architecture.svg" alt="Architecture" width="100%"/>
 </p>
 
-## 特性
-
-- **Bedrock Claude 全系列** — Opus 4.6/4.5/4.1, Sonnet 4.6/4.5/3.7/3.5, Haiku 4.5，通配符路由 `bedrock/*`
-- **完整降级链** — 自动 Fallback，3 次失败后切换备用模型
-- **零静态凭证** — EKS IRSA（IAM Roles for Service Accounts），无需管理 AWS Access Key
-- **Serverless 计算** — EKS Fargate，按需付费无需管理节点
-- **Prompt Caching** — Bedrock 原生支持，Claude Code 自动生效，~90% input 成本节省
-- **RDS PostgreSQL** — API Key 管理 + Admin UI + 使用量统计
-- **可选安全增强** — WAF 速率限制 + Cognito 用户认证
+> 详细架构说明 → [docs/architecture.md](docs/architecture.md)
 
 ## 快速开始
+
+### 前置条件
+
+AWS CLI v2 · Terraform ≥ 1.5 · kubectl · Helm 3 · envsubst
+
+### 部署
 
 ```bash
 git clone https://github.com/cncoder/serverless-litellm.git
@@ -38,11 +44,7 @@ cd serverless-litellm
 ./scripts/setup.sh
 ```
 
-### 前置条件
-
-AWS CLI v2 · Terraform ≥ 1.5 · kubectl · Helm 3 · envsubst
-
-## 配置 Claude Code
+### 配置 Claude Code
 
 将以下内容写入 `~/.claude/settings.json`，**只需替换 2 个值**：
 
@@ -63,37 +65,19 @@ AWS CLI v2 · Terraform ≥ 1.5 · kubectl · Helm 3 · envsubst
 
 > 详细配置（完整模板、迁移指南、Prompt Caching、Troubleshooting）→ [docs/claude-code.md](docs/claude-code.md)
 
-## 配置 OpenClaw
-
-> [OpenClaw](https://github.com/openclaw/openclaw) 集成详见 [docs/openclaw.md](docs/openclaw.md)
-
 ## 文档
 
 | 文档 | 说明 |
 |------|------|
 | ⭐ [Claude Code 配置](docs/claude-code.md) | settings.json 模板、模型选择、迁移指南 |
-| ⭐ [架构设计](docs/architecture.md) | EKS, IRSA, Fargate, 网络拓扑 |
+| ⭐ [架构设计](docs/architecture.md) | 网络拓扑、安全机制、计算层 |
 | [可用模型](docs/models.md) | 模型列表、Fallback 链、路由策略 |
 | [API 调用示例](docs/API_USAGE.md) | OpenAI SDK / Anthropic SDK / cURL |
-| [手动部署](docs/manual-deploy.md) | Terraform 变量、两阶段 ACM |
+| [手动部署](docs/manual-deploy.md) | Terraform 变量、分步部署 |
 | [故障排查](docs/troubleshooting.md) | 真实生产环境经验 |
-| [测试指南](docs/testing-guide.md) | 功能 / 性能 / HA / 安全 |
 | [Bedrock 监控](docs/bedrock-monitoring-guide.md) | 用量监控与成本分析 |
-
-## CloudFront + WAF 加固
-
-部署后建议通过 CloudFront + WAF 实现三层防护（ALB SG → WAF Header → 路径白名单）。详见 [skills/cloudfront-waf-hardening/SKILL.md](skills/cloudfront-waf-hardening/SKILL.md)。
-
-## 超时配置
-
-| 组件 | 配置值 | 说明 |
-|------|--------|------|
-| CloudFront OriginReadTimeout | 60s | 首字节限制；Streaming 不受此限 |
-| ALB Idle Timeout | 600s | 连接空闲断开时间 |
-| LiteLLM request_timeout | 600s | 代理层超时 |
-| K8s Ingress idle_timeout | 600s | ALB Ingress 注解 |
-
-> Claude Code 默认走 Streaming，不受 CloudFront 60s 首字节限制。
+| [测试指南](docs/testing-guide.md) | 功能 / 性能 / HA / 安全 |
+| [OpenClaw 集成](docs/openclaw.md) | OpenClaw Agent 框架对接 |
 
 ## 目录结构
 
@@ -113,11 +97,6 @@ MIT
 
 - [Claude Code 快速开始](https://code.claude.com/docs/en/quickstart)
 - [Claude Code LLM Gateway 配置](https://code.claude.com/docs/en/llm-gateway)
-- [Anthropic Prompt Caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
 - [AWS Bedrock Prompt Caching](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)
-- [AWS Bedrock Claude 模型参数](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html)
-- [AWS Bedrock Cross-Region Inference](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html)
 - [LiteLLM Bedrock 集成](https://docs.litellm.ai/docs/providers/bedrock)
-- [LiteLLM + Claude API](https://docs.litellm.ai/docs/tutorials/claude_responses_api)
-- [EKS Fargate 文档](https://docs.aws.amazon.com/eks/latest/userguide/fargate.html)
-- [EKS IRSA 文档](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+- [AWS Bedrock Cross-Region Inference](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html)
