@@ -18,6 +18,8 @@ data:
       - claude-opus-4-6-us:
         - claude-opus-4-6-global
       - claude-opus-4-6-global:
+        - claude-opus-4-1
+      - claude-opus-4-1:
         - claude-opus-4-5
       - claude-opus-4-5:
         - claude-sonnet-4-6-us
@@ -32,27 +34,12 @@ data:
       - claude-haiku-4-5:
         - claude-sonnet-3-5
       json_logs: true
-      log_raw_request_response: true
+      log_raw_request_response: false
       model_group_alias:
-        claude-haiku-4-5-20241022: claude-haiku-4-5
-        claude-opus-4-5-20251101: claude-opus-4-5
-        claude-opus-4-6-20250915: claude-opus-4-6
-        claude-opus-4-6-20250915-v1: claude-opus-4-6
-        claude-sonnet-3-5-20241022: claude-sonnet-3-5
-        claude-sonnet-3-7-20250219: claude-sonnet-3-7
-        claude-sonnet-4-5-20250929: claude-sonnet-4-5
-        claude-sonnet-4-6-20250514: claude-sonnet-4-6
-        claude-sonnet-4-6-20250514-v1: claude-sonnet-4-6
-        global.anthropic.claude-haiku-4-5-20251001-v1:0: claude-haiku-4-5
-        global.anthropic.claude-opus-4-5-20251101-v1:0: claude-opus-4-5
-        global.anthropic.claude-opus-4-6-v1: claude-opus-4-6
-        global.anthropic.claude-sonnet-4-5-20250929-v1:0: claude-sonnet-4-5
-        global.anthropic.claude-sonnet-4-6: claude-sonnet-4-6
-        haiku: claude-haiku-4-5
-        opus: claude-opus-4-6
-        sonnet: claude-sonnet-4-6
-        us.anthropic.claude-opus-4-6-v1: claude-opus-4-6
-        us.anthropic.claude-sonnet-4-6: claude-sonnet-4-6
+        # NOTE: model_group_alias works for /chat/completions (OpenAI format) only.
+        # For /v1/messages (Anthropic format), aliases are handled by duplicate model_list entries below.
+        claude-opus-4-1-20250805: claude-opus-4-1
+        claude-opus-4-1-20250805-v1: claude-opus-4-1
       num_retries: 3
       request_timeout: 600
       success_callback: []
@@ -77,6 +64,12 @@ data:
       model_info:
         id: claude-opus-4-5
       model_name: claude-opus-4-5
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0
+      model_info:
+        id: claude-opus-4-1
+      model_name: claude-opus-4-1
     - litellm_params:
         aws_region_name: us-west-2
         model: bedrock/us.anthropic.claude-sonnet-4-6
@@ -197,6 +190,18 @@ data:
       model_info:
         id: alias-haiku
       model_name: haiku
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0
+      model_info:
+        id: alias-claude-opus-4-1-20250805
+      model_name: claude-opus-4-1-20250805
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0
+      model_info:
+        id: alias-us-anthropic-opus-4-1
+      model_name: us.anthropic.claude-opus-4-1-20250805-v1:0
     router_settings:
       allowed_fails: 3
       cooldown_time: 60

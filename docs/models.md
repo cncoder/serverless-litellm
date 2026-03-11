@@ -7,6 +7,7 @@
 | `claude-opus-4-6-us` | `us.anthropic.claude-opus-4-6-v1` | us | |
 | `claude-opus-4-6-global` | `global.anthropic.claude-opus-4-6-v1` | global | |
 | `claude-opus-4-5` | `global.anthropic.claude-opus-4-5-20251101-v1:0` | global | |
+| `claude-opus-4-1` | `us.anthropic.claude-opus-4-1-20250805-v1:0` | us | |
 | `claude-sonnet-4-6-us` | `us.anthropic.claude-sonnet-4-6` | us | |
 | `claude-sonnet-4-6-global` | `global.anthropic.claude-sonnet-4-6` | global | |
 | `claude-opus-4-6` | `us.anthropic.claude-opus-4-6-v1` | us | Claude Code 默认别名 |
@@ -29,7 +30,8 @@
 ```
 claude-opus-4-6-us
   └─失败(3次)→ claude-opus-4-6-global
-                └─失败(3次)→ claude-opus-4-5
+                └─失败(3次)→ claude-opus-4-1
+                              └─失败(3次)→ claude-opus-4-5
                               └─失败(3次)→ claude-sonnet-4-6-us
                                             └─失败(3次)→ claude-sonnet-4-6-global
                                                           └─失败(3次)→ claude-sonnet-4-5

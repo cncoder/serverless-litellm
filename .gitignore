@@ -37,6 +37,7 @@ Thumbs.db
 
 # Test results (may contain sensitive data)
 test-results/
+docs/test-results-*
 
 # Benchmark data (may contain account-specific info)
 data/bedrock-benchmark/
