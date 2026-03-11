@@ -50,6 +50,46 @@ claude --print "hello world"
 
 ---
 
+## VS Code / Cursor 集成
+
+Claude Code 的 VS Code 扩展使用不同的配置路径。需要在 VS Code 设置中配置：
+
+### 用户级设置（全局生效）
+
+打开 VS Code → `Cmd+Shift+P` → `Preferences: Open User Settings (JSON)`，添加：
+
+```json
+{
+  "claudeCode.apiBaseUrl": "https://<YOUR_LITELLM_DOMAIN>",
+  "claudeCode.apiKey": "<YOUR_LITELLM_KEY>",
+  "claudeCode.selectedModel": "claude-sonnet-4-6"
+}
+```
+
+### 项目级设置（仅当前项目）
+
+在项目根目录创建 `.vscode/settings.json`：
+
+```json
+{
+  "claudeCode.apiBaseUrl": "https://<YOUR_LITELLM_DOMAIN>",
+  "claudeCode.apiKey": "<YOUR_LITELLM_KEY>",
+  "claudeCode.selectedModel": "claude-opus-4-6"
+}
+```
+
+### 配置优先级
+
+| 优先级 | 位置 | 说明 |
+|--------|------|------|
+| 1（最高） | `.vscode/settings.json` | 项目级，可按项目选模型 |
+| 2 | VS Code 用户设置 | 全局默认 |
+| 3 | `~/.claude/settings.json` | CLI 配置（VS Code 扩展不读） |
+
+> ⚠️ **CLI 和 VS Code 扩展配置互不影响**。CLI 用 `~/.claude/settings.json`，VS Code 扩展用 VS Code 自己的设置。两边都要配。
+
+---
+
 ## 可用模型
 
 | 模型参数 | 说明 |
