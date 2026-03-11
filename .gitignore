@@ -42,3 +42,4 @@ docs/test-results-*
 # Benchmark data (may contain account-specific info)
 data/bedrock-benchmark/
 scripts/bedrock-region-benchmark.py
+terraform/terraform.tfvars
