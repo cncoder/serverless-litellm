@@ -49,7 +49,7 @@ irm https://claude.ai/install.ps1 | iex
 
 ---
 
-## 配置 — CLI
+## 配置
 
 将以下内容写入 `~/.claude/settings.json`，**替换 2 个值**即可使用：
 
@@ -70,45 +70,12 @@ irm https://claude.ai/install.ps1 | iex
 
 > ⚠️ `ANTHROPIC_BASE_URL` **不要加 `/v1` 后缀** — Claude Code 会自动拼接 `/v1/messages`
 
+**项目级配置**：也可以在项目根目录创建 `.claude/settings.json`，格式相同，会覆盖全局配置。
+
 验证：
 
 ```bash
 claude --print "hello world"
-```
-
----
-
-## 配置 — VS Code / Cursor
-
-VS Code 扩展和 CLI **共享 `~/.claude/settings.json`**，API 配置只需写一次。
-
-VS Code 侧只需补充两个扩展设置：
-
-```json
-// VS Code Settings (Cmd+Shift+P → Preferences: Open User Settings JSON)
-{
-  "claudeCode.disableLoginPrompt": true,
-  "claudeCode.selectedModel": "claude-sonnet-4-6"
-}
-```
-
-| 设置 | 作用 |
-|------|------|
-| `disableLoginPrompt` | 跳过 Anthropic 登录（使用第三方 provider **必须开启**） |
-| `selectedModel` | 新对话默认模型，也可以在对话中用 `/model` 切换 |
-
-> **`claudeCode.apiBaseUrl` 和 `claudeCode.apiKey` 不存在** — VS Code 扩展没有这两个设置项。API 地址和 Key 只能通过 `~/.claude/settings.json` 配置。
->
-> 官方文档：https://code.claude.com/docs/en/vs-code
-
-### 配置优先级
-
-```
-~/.claude/settings.json env（最高）
-        ↓
-VS Code claudeCode.* 设置
-        ↓
-Shell 环境变量（最低，但会触发 AWS 环境检测！）
 ```
 
 ---
@@ -241,7 +208,7 @@ source ~/.zshrc
 
 ### 3. VS Code 用户设置
 
-检查 `claudeCode.environmentVariables` 中是否有 Bedrock 相关变量，有则删除。
+检查 `claudeCode.environmentVariables` 和 `terminal.integrated.env.osx` 中是否有 Bedrock 相关变量，有则删除。
 
 ### 迁移 Diff
 
@@ -271,6 +238,47 @@ source ~/.zshrc
 ```
 
 将需要保留的选项迁移到 `~/.claude/settings.json` 的 `env` 字段（如 `CLAUDE_CODE_MAX_OUTPUT_TOKENS`）。
+
+---
+
+## VS Code / Cursor 扩展说明
+
+> ⚠️ **当前限制**：VS Code 扩展**没有** `apiBaseUrl` 或 `apiKey` 设置项。以下方式均**不能**配置 API 端点：
+> - ❌ `claudeCode.apiBaseUrl` — 不存在
+> - ❌ `claudeCode.apiKey` — 不存在  
+> - ❌ `terminal.integrated.env.osx` — 只影响终端，扩展面板是独立进程
+> - ❌ 项目级 `.vscode/settings.json` — 扩展不从这里读 API 配置
+
+**唯一有效的方式**：通过 `~/.claude/settings.json`（全局）或项目根目录 `.claude/settings.json`（项目级）配置。VS Code 扩展和 CLI 共享这个文件。
+
+### VS Code 扩展可用设置
+
+```json
+{
+  "claudeCode.disableLoginPrompt": true,
+  "claudeCode.selectedModel": "claude-sonnet-4-6",
+  "claudeCode.preferredLocation": "panel"
+}
+```
+
+| 设置 | 作用 |
+|------|------|
+| `disableLoginPrompt` | 跳过 Anthropic 登录（使用第三方 provider **必须开启**） |
+| `selectedModel` | 新对话默认模型，也可以在对话中用 `/model` 切换 |
+| `preferredLocation` | `panel`（新标签页）或 `sidebar`（右侧栏） |
+| `environmentVariables` | 传递环境变量给 Claude 进程（字符串数组，如 `["KEY=VALUE"]`） |
+
+> 官方文档：https://code.claude.com/docs/en/vs-code
+
+### 配置优先级
+
+```
+~/.claude/settings.json env（最高）
+        ↓
+VS Code claudeCode.* 设置（仅 UI 行为 + selectedModel）
+        ↓
+Shell 环境变量（最低，但会触发 AWS 环境检测！）
+```
 
 ---
 
