@@ -4,6 +4,23 @@
 
 ---
 
+## 安装 Claude Code
+
+```bash
+# macOS / Linux / WSL
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Homebrew
+brew install claude-code
+
+# Windows PowerShell
+irm https://claude.ai/install.ps1 | iex
+```
+
+> 详细文档：https://code.claude.com/docs/en/quickstart
+
+---
+
 ## 配置
 
 将以下内容写入 `~/.claude/settings.json`，**替换 2 个值**即可使用：
@@ -44,7 +61,7 @@ claude --print "hello world"
 
 短名也可以：`opus` / `sonnet` / `haiku`
 
-> 完整列表（含 Opus 4.5、Sonnet 4.5/3.7/3.5、带日期后缀、Bedrock 格式）→ [models.md](models.md)
+> 完整列表（含 Opus 4.5、Sonnet 4.5/3.7、带日期后缀、Bedrock 格式）→ [models.md](models.md)
 
 ---
 
@@ -58,6 +75,43 @@ Claude Code → ANTHROPIC_BASE_URL/v1/messages → LiteLLM → AWS Bedrock
 - LiteLLM 转换并路由到 Bedrock 后端
 - 不需要真实 Anthropic API Key，LiteLLM Key 即可
 - 服务端 `drop_params: true` 自动处理不兼容参数（如 `eager_input_streaming`）
+
+---
+
+## Prompt Caching
+
+**自动生效 ✅** — 无需额外配置。
+
+Claude Code 内部使用 block-level `cache_control`，通过 LiteLLM → Bedrock 链路自动启用 prompt caching。
+
+| 请求 | cache_write | cache_read | 说明 |
+|------|-------------|------------|------|
+| 首次 | 2860 | 0 | 写入缓存 |
+| 重复前缀 | 0 | 2860 | **~90% input 成本节省** |
+| 不同 user msg | 0 | 2860 | system prefix 命中 |
+
+**Bedrock 原生支持**（[AWS 文档](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)）：
+- 所有 Claude 模型，最多 4 个 cache checkpoint
+- 默认 5 分钟 TTL（Opus 4.5/Sonnet 4.5/Haiku 4.5 支持 1 小时 TTL）
+- Cache read = 基础 input 的 10%，cache write = 125%
+
+---
+
+## Troubleshooting
+
+**CC 仍走 Bedrock 直连**（`400 The provided model identifier is invalid`）：
+```bash
+grep -E 'BEDROCK|AWS_REGION|ANTHROPIC_MODEL' ~/.claude/settings.json
+```
+→ 删除匹配的字段。详见下方「从 Bedrock 直连迁移」。
+
+**`eager_input_streaming` 报错**：
+→ 确保 LiteLLM ConfigMap 中 `drop_params: true`（本项目默认已启用）。
+
+**模型名 404**：
+→ 确认模型名在 [models.md](models.md) 列表中。如需新增别名，在 ConfigMap `model_list` 中添加条目。
+
+> 更多场景 → [troubleshooting.md](troubleshooting.md)
 
 ---
 
@@ -94,60 +148,6 @@ Claude Code → ANTHROPIC_BASE_URL/v1/messages → LiteLLM → AWS Bedrock
 + "model": "claude-sonnet-4-6",
 + "smallFastModel": "claude-haiku-4-5"
 ```
-
----
-
-## Prompt Caching
-
-**自动生效 ✅** — 无需额外配置。
-
-Claude Code 内部使用 block-level `cache_control`，通过 LiteLLM → Bedrock 链路自动启用 prompt caching。
-
-| 请求 | cache_write | cache_read | 说明 |
-|------|-------------|------------|------|
-| 首次 | 2860 | 0 | 写入缓存 |
-| 重复前缀 | 0 | 2860 | **~90% input 成本节省** |
-| 不同 user msg | 0 | 2860 | system prefix 命中 |
-
-**Bedrock 原生支持**（[AWS 文档](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)）：
-- 所有 Claude 模型，最多 4 个 cache checkpoint
-- 默认 5 分钟 TTL（Opus 4.5/Sonnet 4.5/Haiku 4.5 支持 1 小时 TTL）
-- Cache read = 基础 input 的 10%，cache write = 125%
-
----
-
-## Troubleshooting
-
-**CC 仍走 Bedrock 直连**（`400 The provided model identifier is invalid`）：
-```bash
-grep -E 'BEDROCK|AWS_REGION|ANTHROPIC_MODEL' ~/.claude/settings.json
-```
-→ 删除匹配的字段。详见「从 Bedrock 直连迁移」。
-
-**`eager_input_streaming` 报错**：
-→ 确保 LiteLLM ConfigMap 中 `drop_params: true`（本项目默认已启用）。
-
-**模型名 404**：
-→ 确认模型名在 [models.md](models.md) 列表中。如需新增别名，在 ConfigMap `model_list` 中添加条目。
-
-> 更多场景 → [troubleshooting.md](troubleshooting.md)
-
----
-
-## 安装 Claude Code
-
-```bash
-# macOS / Linux / WSL
-curl -fsSL https://claude.ai/install.sh | bash
-
-# Homebrew
-brew install claude-code
-
-# Windows PowerShell
-irm https://claude.ai/install.ps1 | iex
-```
-
-> 详细文档：https://code.claude.com/docs/en/quickstart
 
 ---
 
