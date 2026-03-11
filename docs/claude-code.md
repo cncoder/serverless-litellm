@@ -160,18 +160,26 @@ Claude Code → ANTHROPIC_BASE_URL/v1/messages → LiteLLM → AWS Bedrock
 
 ## Prompt Caching
 
-**显式 block-level prompt caching 在 Bedrock 上已可用 ✅**，经实测验证：
+**Prompt caching 在 Bedrock 上完全可用 ✅**，无需额外配置。
+
+Claude Code 内部使用显式 block-level `cache_control`，通过 LiteLLM → Bedrock 链路时 prompt caching **自动生效**。
+
+### 实测数据
 
 | 请求 | input_tokens | cache_write | cache_read | 节省 |
 |------|-------------|-------------|------------|------|
 | 首次请求 | 8 | 2860 | 0 | — |
 | 重复前缀 | 8 | 0 | 2860 | **~90% input 成本** |
 
-Claude Code 内部使用显式 block-level `cache_control`，因此通过 LiteLLM → Bedrock 链路使用 CC 时，**prompt caching 自动生效，无需额外配置**。
+### Bedrock 原生支持（来源：[AWS Bedrock 文档](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)）
 
-> ⚠️ **自动缓存**（顶层 `cache_control`）目前仅 Anthropic API 直连和 Azure AI Foundry 支持，Bedrock 暂不支持。但这不影响 Claude Code，因为 CC 使用的是显式 block-level 方式。
->
-> 参考：https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+- 所有 Claude 模型均支持，最多 **4 个 cache checkpoint**
+- 默认 **5 分钟 TTL**（Opus 4.5 / Sonnet 4.5 / Haiku 4.5 还支持 **1 小时 TTL**）
+- 可缓存字段：`system`、`messages`、`tools`
+- Cache read 费率 = 基础 input 的 **10%**，cache write = 基础 input 的 **125%**
+- 支持 Simplified Cache Management（自动在静态内容末尾放 checkpoint）
+
+> 参考：[Anthropic Prompt Caching 文档](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) | [AWS Bedrock Prompt Caching](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)
 
 ---
 
