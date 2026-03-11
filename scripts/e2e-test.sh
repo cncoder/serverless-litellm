@@ -256,7 +256,7 @@ MODELS=(
   "claude-sonnet-4-6-global"
   "claude-sonnet-4-5"
   "claude-sonnet-3-7"
-  "claude-sonnet-3-5"
+  "claude-sonnet-4-6"
   "claude-haiku-4-5"
 )
 

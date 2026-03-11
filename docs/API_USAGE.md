@@ -24,7 +24,7 @@
 | `claude-sonnet-4-6` | us | Sonnet 4.6 兼容别名 |
 | `claude-sonnet-4-5` | global | 平衡性能与成本 |
 | `claude-sonnet-3-7` | us | 性价比高 |
-| `claude-sonnet-3-5` | us | 快速响应 |
+| `claude-sonnet-3-7` | us | 经典可靠 |
 | `claude-haiku-4-5` | global | 最快最便宜 |
 
 ---
@@ -312,5 +312,5 @@ curl https://litellm.example.com/health/readiness
 当主模型不可用时，自动降级到备选模型：
 
 - `claude-opus-4-6-us` -> `claude-opus-4-6-global` -> `claude-opus-4-5` -> `claude-sonnet-4-6-us` -> `claude-sonnet-4-6-global` -> `claude-sonnet-4-5`
-- `claude-sonnet-4-5` -> `claude-sonnet-3-7` -> `claude-sonnet-3-5`
-- `claude-haiku-4-5` -> `claude-sonnet-3-5`
+- `claude-sonnet-4-5` -> `claude-sonnet-3-7` -> `claude-sonnet-4-6-us`
+- `claude-haiku-4-5` -> `claude-sonnet-4-6-us`

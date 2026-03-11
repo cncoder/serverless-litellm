@@ -1,7 +1,7 @@
 #!/bin/bash
 # LiteLLM 压测脚本
 # 用法: ./scripts/benchmark.sh [并发数] [总请求数] [模型名称]
-# 示例: ./scripts/benchmark.sh 10 100 claude-sonnet-3-5
+# 示例: ./scripts/benchmark.sh 10 100 claude-sonnet-4-6
 
 set -e
 
@@ -18,7 +18,7 @@ LITELLM_URL="${LITELLM_URL:-https://litellm.example.com}"
 API_KEY="${API_KEY:-${LITELLM_MASTER_KEY:-}}"
 CONCURRENCY="${1:-5}"
 TOTAL_REQUESTS="${2:-20}"
-MODEL="${3:-claude-sonnet-3-5}"
+MODEL="${3:-claude-sonnet-4-6}"
 
 # 如果没有设置 API_KEY，尝试从 kubernetes secret 获取
 if [ -z "$API_KEY" ]; then

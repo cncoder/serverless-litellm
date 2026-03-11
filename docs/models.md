@@ -15,7 +15,6 @@
 | `claude-haiku-4-5-20251001` | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | global | Claude Code 默认别名 |
 | `claude-sonnet-4-5` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | global | |
 | `claude-sonnet-3-7` | `us.anthropic.claude-3-7-sonnet-20250219-v1:0` | us | |
-| `claude-sonnet-3-5` | `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | us | |
 | `claude-haiku-4-5` | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | global | |
 | `bedrock/*` | 任意 Bedrock 模型 ID | 通配符（直接透传）| |
 
@@ -36,10 +35,11 @@ claude-opus-4-6-us
                                             └─失败(3次)→ claude-sonnet-4-6-global
                                                           └─失败(3次)→ claude-sonnet-4-5
                                                                         └─失败(3次)→ claude-sonnet-3-7
-                                                                                      └─失败(3次)→ claude-sonnet-3-5 (兜底)
+                                                                                      └─失败(3次)→ claude-sonnet-3-7
+                                                                                                        └─失败(3次)→ claude-sonnet-4-6-us (回环兜底)
 
 claude-haiku-4-5
-  └─失败(3次)→ claude-sonnet-3-5 (兜底)
+  └─失败(3次)→ claude-sonnet-4-6-us (兜底)
 ```
 
 **Fallback 参数**:

@@ -22,7 +22,7 @@
   EN  [OK]   2.35s  I am Claude, made by Anthropic...
   ZH  [OK]   1.89s  我是 Claude，由 Anthropic 开发...
 
-[2/9] claude-sonnet-3-5-us
+[2/9] claude-sonnet-4-6-us
   EN  [OK]   1.42s  Hello! I'm Claude...
   ZH  [OK]   1.38s  你好！我是 Claude...
 
@@ -55,7 +55,7 @@ curl -N https://litellm.example.com/chat/completions \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "claude-sonnet-3-5-us",
+    "model": "claude-sonnet-4-6-us",
     "messages": [{"role": "user", "content": "Count to 10"}],
     "stream": true
   }'
@@ -93,7 +93,7 @@ kubectl logs -f deployment/litellm -n litellm | grep -i fallback
 
 # 示例日志输出
 # [INFO] Primary model claude-opus-4-6-us failed: ThrottlingException
-# [INFO] Falling back to claude-sonnet-3-5-us
+# [INFO] Falling back to claude-sonnet-4-6-us
 # [INFO] Fallback successful, response returned
 ```
 
@@ -109,7 +109,7 @@ curl -s https://litellm.example.com/chat/completions \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "claude-sonnet-3-5-us",
+    "model": "claude-sonnet-4-6-us",
     "messages": [
       {"role": "user", "content": "My name is Alice"},
       {"role": "assistant", "content": "Nice to meet you, Alice!"},
@@ -232,7 +232,7 @@ LITELLM_MASTER_KEY=sk-xxx \
 ./scripts/benchmark.sh 5 50 claude-haiku-4-5
 
 # 中等负载测试
-./scripts/benchmark.sh 20 200 claude-sonnet-3-5-us
+./scripts/benchmark.sh 20 200 claude-sonnet-4-6-us
 
 # 高负载测试
 ./scripts/benchmark.sh 50 500 claude-haiku-4-5
@@ -388,7 +388,7 @@ curl https://litellm.example.com/v1/models \
 | **健康检查** | GET /health/liveliness | 200 OK | ☐ |
 | **健康检查** | GET /health/readiness | 200 OK + DB connected | ☐ |
 | **模型** | claude-opus-4-6-us | 200 + 响应 | ☐ |
-| **模型** | claude-sonnet-3-5-us | 200 + 响应 | ☐ |
+| **模型** | claude-sonnet-4-6-us | 200 + 响应 | ☐ |
 | **模型** | claude-haiku-4-5 | 200 + 响应 | ☐ |
 | **模型** | 所有 9 个模型 | test-models.sh 全部通过 | ☐ |
 | **降级** | 主模型不可用 | 自动降级到备用模型 | ☐ |

@@ -30,9 +30,9 @@ data:
       - claude-sonnet-4-5:
         - claude-sonnet-3-7
       - claude-sonnet-3-7:
-        - claude-sonnet-3-5
+        - claude-sonnet-4-6-us
       - claude-haiku-4-5:
-        - claude-sonnet-3-5
+        - claude-sonnet-4-6-us
       json_logs: true
       log_raw_request_response: false
       model_group_alias:
@@ -114,12 +114,6 @@ data:
       model_name: claude-sonnet-3-7
     - litellm_params:
         aws_region_name: us-west-2
-        model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
-      model_info:
-        id: claude-sonnet-3-5
-      model_name: claude-sonnet-3-5
-    - litellm_params:
-        aws_region_name: us-west-2
         model: bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0
       model_info:
         id: claude-haiku-4-5
@@ -166,12 +160,6 @@ data:
       model_info:
         id: alias-claude-sonnet-3-7-20250219
       model_name: claude-sonnet-3-7-20250219
-    - litellm_params:
-        aws_region_name: us-west-2
-        model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
-      model_info:
-        id: alias-claude-sonnet-3-5-20241022
-      model_name: claude-sonnet-3-5-20241022
     - litellm_params:
         aws_region_name: us-west-2
         model: bedrock/us.anthropic.claude-opus-4-6-v1
