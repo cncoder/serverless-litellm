@@ -49,6 +49,35 @@ Claude Code 内部自动使用 block-level `cache_control`，通过 LiteLLM → 
 
 ---
 
+## 隐私与遥测
+
+建议在 `settings.json` 的 `env` 中关闭非必要的遥测和错误上报，避免敏感代码/对话数据外传：
+
+```jsonc
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://<your-domain>",
+    "ANTHROPIC_API_KEY": "<your-litellm-key>",
+    // 👇 隐私推荐 — 关闭遥测和错误上报
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "DISABLE_BUG_COMMAND": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  }
+}
+```
+
+| 参数 | 作用 |
+|------|------|
+| `DISABLE_TELEMETRY` | 关闭使用数据上报到 Anthropic |
+| `DISABLE_ERROR_REPORTING` | 关闭崩溃/错误上报（含堆栈、对话片段） |
+| `DISABLE_BUG_COMMAND` | 禁用 `/bug` 命令（提交 bug report 会附带对话上下文） |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | 关闭所有非核心网络请求（自动更新检查等） |
+
+> ⚠️ 企业内网 / 合规场景强烈建议全部开启。已通过 LiteLLM 代理的流量不受影响，这些参数只控制 Claude Code 客户端自身的行为。
+
+---
+
 ## Troubleshooting
 
 ### CC 仍走 Bedrock 直连

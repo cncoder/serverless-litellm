@@ -62,7 +62,11 @@ npm install -g @anthropic-ai/claude-code
 {
   "env": {
     "ANTHROPIC_BASE_URL": "https://<your-domain>",   // ← 替换
-    "ANTHROPIC_API_KEY": "<your-litellm-key>"         // ← 替换
+    "ANTHROPIC_API_KEY": "<your-litellm-key>",        // ← 替换
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "DISABLE_BUG_COMMAND": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   },
   "model": "claude-sonnet-4-6",
   "smallFastModel": "claude-haiku-4-5"
