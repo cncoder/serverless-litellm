@@ -136,6 +136,21 @@ module "alb_controller" {
   depends_on = [module.eks, module.iam_irsa]
 }
 
+# CloudFront Module
+module "cloudfront" {
+  count  = var.enable_cloudfront ? 1 : 0
+  source = "./modules/cloudfront"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  alb_dns_name        = var.alb_dns_name
+  acm_certificate_arn = var.cloudfront_acm_certificate_arn
+  cloudfront_domain   = var.cloudfront_domain
+  vpc_id              = local.vpc_id
+
+  depends_on = [module.post_deploy]
+}
+
 # WAF Module
 module "waf" {
   count  = var.enable_waf ? 1 : 0

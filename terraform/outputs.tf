@@ -53,3 +53,19 @@ output "rds_identifier" {
   description = "RDS instance identifier"
   value       = module.rds.db_identifier
 }
+
+output "cloudfront_distribution_domain" {
+  description = "CloudFront distribution domain name"
+  value       = var.enable_cloudfront ? module.cloudfront[0].distribution_domain_name : null
+}
+
+output "cf_origin_secret" {
+  description = "Shared secret for X-CF-Secret header (configure ALB to validate this)"
+  value       = var.enable_cloudfront ? module.cloudfront[0].cf_origin_secret : null
+  sensitive   = true
+}
+
+output "cloudfront_alb_security_group_id" {
+  description = "Security group ID that restricts ALB to CloudFront-only ingress"
+  value       = var.enable_cloudfront ? module.cloudfront[0].alb_security_group_id : null
+}

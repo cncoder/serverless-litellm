@@ -116,6 +116,31 @@ variable "litellm_service_account" {
   default     = "litellm-sa"
 }
 
+# CloudFront
+variable "enable_cloudfront" {
+  description = "是否启用 CloudFront CDN（启用后 ALB 仅接受 CloudFront 入站）"
+  type        = bool
+  default     = false
+}
+
+variable "cloudfront_acm_certificate_arn" {
+  description = "ACM certificate ARN in us-east-1 for CloudFront custom domain"
+  type        = string
+  default     = ""
+}
+
+variable "cloudfront_domain" {
+  description = "Alternate domain name (CNAME) for CloudFront distribution"
+  type        = string
+  default     = ""
+}
+
+variable "alb_dns_name" {
+  description = "ALB DNS name (from kubectl get ingress). Required when enable_cloudfront=true"
+  type        = string
+  default     = ""
+}
+
 # WAF
 variable "enable_waf" {
   description = "是否启用 WAF 防护"
