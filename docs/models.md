@@ -4,6 +4,9 @@
 
 | 模型名 | Bedrock Model ID | 区域类型 | 备注 |
 |--------|-----------------|---------|------|
+| `claude-opus-4-7-us` | `us.anthropic.claude-opus-4-7` | us | **新** |
+| `claude-opus-4-7-global` | `global.anthropic.claude-opus-4-7` | global | **新** |
+| `claude-opus-4-7` | `us.anthropic.claude-opus-4-7` | us | Claude Code 默认别名 **新** |
 | `claude-opus-4-6-us` | `us.anthropic.claude-opus-4-6-v1` | us | |
 | `claude-opus-4-6-global` | `global.anthropic.claude-opus-4-6-v1` | global | |
 | `claude-opus-4-5` | `global.anthropic.claude-opus-4-5-20251101-v1:0` | global | |
@@ -27,6 +30,12 @@
 ## Fallback 降级链
 
 ```
+claude-opus-4-7-us
+  └─失败(3次)→ claude-opus-4-7-global
+                └─失败(3次)→ claude-opus-4-6-us
+                              └─失败(3次)→ claude-opus-4-6-global
+                                            └─失败(3次)→ claude-opus-4-1
+
 claude-opus-4-6-us
   └─失败(3次)→ claude-opus-4-6-global
                 └─失败(3次)→ claude-opus-4-1
