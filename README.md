@@ -68,14 +68,14 @@ npm install -g @anthropic-ai/claude-code
     "DISABLE_BUG_COMMAND": "1",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   },
-  "model": "claude-sonnet-4-6",
+  "model": "claude-opus-4-7",
   "smallFastModel": "claude-haiku-4-5"
 }
 ```
 
 **验证**：`claude --print "hello"`
 
-切换模型：`claude --model claude-opus-4-6` / `claude --model opus` / `claude --model claude-opus-4-1`
+切换模型：`claude --model claude-opus-4-7` / `claude --model opus` / `claude --model claude-sonnet-4-6`
 
 > 详细配置（可选参数、迁移指南、Prompt Caching、Troubleshooting）→ [docs/claude-code.md](docs/claude-code.md)
 

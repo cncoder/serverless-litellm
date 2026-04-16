@@ -10,9 +10,10 @@
 
 | 模型参数 | 说明 |
 |---------|------|
-| `claude-opus-4-6` | Opus 4.6（最新最强） |
+| `claude-opus-4-7` | **Opus 4.7（最新最强）** |
+| `claude-opus-4-6` | Opus 4.6 |
 | `claude-opus-4-1` | Opus 4.1 |
-| `claude-sonnet-4-6` | **Sonnet 4.6（推荐默认）** |
+| `claude-sonnet-4-6` | Sonnet 4.6（推荐默认） |
 | `claude-haiku-4-5` | Haiku 4.5（最快最便宜） |
 
 短名也可以：`opus` / `sonnet` / `haiku`
