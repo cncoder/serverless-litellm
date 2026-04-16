@@ -131,12 +131,17 @@ tools.0.custom.eager_input_streaming: Extra inputs are not permitted
 tools.3.custom.input_examples: Extra inputs are not permitted
 ```
 
-→ `drop_params: true` **无法修复**（嵌套在 `tools[]` 内部）。需升级 LiteLLM 至 **≥ v1.81.3**（[PR #19841](https://github.com/BerriAI/litellm/pull/19841)）。
+**根因**：CC v2.0.42+ 在 tool definitions 里加了 `input_examples` 字段，Bedrock 拒绝。`drop_params: true` 只处理顶层参数，嵌套在 `tools[].custom` 里的字段无法 drop。
+
+**修复**：LiteLLM ≥ v1.81.3 已修复（[PR #19841](https://github.com/BerriAI/litellm/pull/19841)），将 `advanced-tool-use` beta 正确映射为 Bedrock-specific header。本项目 Docker 镜像默认使用 ≥ v1.83.x，**无需额外处理**。
+
+如仍遇到此错误，检查 LiteLLM 版本：
 
 ```bash
-# 检查当前版本
-curl -s https://<YOUR_LITELLM_DOMAIN>/health | jq '.version'
+curl -s https://<YOUR_LITELLM_DOMAIN>/health | jq '.litellm_version'
 ```
+
+版本低于 v1.81.3 则升级 Docker 镜像。
 
 ### 模型名 404
 
