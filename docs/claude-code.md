@@ -184,7 +184,7 @@ source ~/.zshrc
     ...
   },
 - "model": "us.anthropic.claude-sonnet-4-6",
-+ "model": "claude-sonnet-4-6",
++ "model": "claude-opus-4-7",
 + "smallFastModel": "claude-haiku-4-5"
 ```
 
