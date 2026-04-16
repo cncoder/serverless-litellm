@@ -15,6 +15,10 @@ data:
       enable_passthrough_endpoints: true
       failure_callback: []
       fallbacks:
+      - claude-opus-4-7-us:
+        - claude-opus-4-7-global
+      - claude-opus-4-7-global:
+        - claude-opus-4-6-us
       - claude-opus-4-6-us:
         - claude-opus-4-6-global
       - claude-opus-4-6-global:
@@ -38,6 +42,7 @@ data:
       model_group_alias:
         # NOTE: model_group_alias works for /chat/completions (OpenAI format) only.
         # For /v1/messages (Anthropic format), aliases are handled by duplicate model_list entries below.
+        claude-opus-4-7-20260416: claude-opus-4-7
         claude-opus-4-1-20250805: claude-opus-4-1
         claude-opus-4-1-20250805-v1: claude-opus-4-1
       num_retries: 3
@@ -46,6 +51,20 @@ data:
       telemetry: false
       turn_off_message_logging: false
     model_list:
+    # Opus 4.7 (2026-04-17)
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-opus-4-7
+      model_info:
+        id: claude-opus-4-7-us
+      model_name: claude-opus-4-7-us
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/global.anthropic.claude-opus-4-7
+      model_info:
+        id: claude-opus-4-7-global
+      model_name: claude-opus-4-7-global
+    # Opus 4.6
     - litellm_params:
         aws_region_name: us-west-2
         model: bedrock/us.anthropic.claude-opus-4-6-v1
@@ -160,9 +179,16 @@ data:
       model_info:
         id: alias-claude-sonnet-3-7-20250219
       model_name: claude-sonnet-3-7-20250219
+    # Opus 4.7 aliases
     - litellm_params:
         aws_region_name: us-west-2
-        model: bedrock/us.anthropic.claude-opus-4-6-v1
+        model: bedrock/us.anthropic.claude-opus-4-7
+      model_info:
+        id: alias-claude-opus-4-7
+      model_name: claude-opus-4-7
+    - litellm_params:
+        aws_region_name: us-west-2
+        model: bedrock/us.anthropic.claude-opus-4-7
       model_info:
         id: alias-opus
       model_name: opus

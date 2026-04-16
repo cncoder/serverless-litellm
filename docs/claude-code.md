@@ -10,9 +10,10 @@
 
 | 模型参数 | 说明 |
 |---------|------|
-| `claude-opus-4-6` | Opus 4.6（最新最强） |
+| `claude-opus-4-7` | **Opus 4.7（最新最强）** |
+| `claude-opus-4-6` | Opus 4.6 |
 | `claude-opus-4-1` | Opus 4.1 |
-| `claude-sonnet-4-6` | **Sonnet 4.6（推荐默认）** |
+| `claude-sonnet-4-6` | Sonnet 4.6（推荐默认） |
 | `claude-haiku-4-5` | Haiku 4.5（最快最便宜） |
 
 短名也可以：`opus` / `sonnet` / `haiku`
@@ -130,12 +131,17 @@ tools.0.custom.eager_input_streaming: Extra inputs are not permitted
 tools.3.custom.input_examples: Extra inputs are not permitted
 ```
 
-→ `drop_params: true` **无法修复**（嵌套在 `tools[]` 内部）。需升级 LiteLLM 至 **≥ v1.81.3**（[PR #19841](https://github.com/BerriAI/litellm/pull/19841)）。
+**根因**：CC v2.0.42+ 在 tool definitions 里加了 `input_examples` 字段，Bedrock 拒绝。`drop_params: true` 只处理顶层参数，嵌套在 `tools[].custom` 里的字段无法 drop。
+
+**修复**：LiteLLM ≥ v1.81.3 已修复（[PR #19841](https://github.com/BerriAI/litellm/pull/19841)），将 `advanced-tool-use` beta 正确映射为 Bedrock-specific header。本项目 Docker 镜像默认使用 ≥ v1.83.x，**无需额外处理**。
+
+如仍遇到此错误，检查 LiteLLM 版本：
 
 ```bash
-# 检查当前版本
-curl -s https://<YOUR_LITELLM_DOMAIN>/health | jq '.version'
+curl -s https://<YOUR_LITELLM_DOMAIN>/health | jq '.litellm_version'
 ```
+
+版本低于 v1.81.3 则升级 Docker 镜像。
 
 ### 模型名 404
 
@@ -183,7 +189,7 @@ source ~/.zshrc
     ...
   },
 - "model": "us.anthropic.claude-sonnet-4-6",
-+ "model": "claude-sonnet-4-6",
++ "model": "claude-opus-4-7",
 + "smallFastModel": "claude-haiku-4-5"
 ```
 
