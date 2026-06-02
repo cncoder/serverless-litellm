@@ -216,6 +216,22 @@ data:
       model_info:
         id: alias-us-anthropic-opus-4-1
       model_name: us.anthropic.claude-opus-4-1-20250805-v1:0
+    # OpenAI GPT-5.5 / GPT-5.4 on Bedrock Mantle (2026-06-01 GA)
+    # Auth: AWS SigV4 via IRSA (same as other Bedrock models, no API key needed)
+    # Region: us-east-2 (launch region for GPT-5.5/5.4)
+    # NOTE: Requires litellm >= 1.83.14 for bedrock/mantle/ routing support
+    - litellm_params:
+        aws_region_name: us-east-2
+        model: bedrock/mantle/openai.gpt-5.5
+      model_info:
+        id: gpt-5-5
+      model_name: gpt-5.5
+    - litellm_params:
+        aws_region_name: us-east-2
+        model: bedrock/mantle/openai.gpt-5.4
+      model_info:
+        id: gpt-5-4
+      model_name: gpt-5.4
     router_settings:
       allowed_fails: 3
       cooldown_time: 60

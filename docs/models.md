@@ -20,11 +20,48 @@
 | `claude-sonnet-3-7` | `us.anthropic.claude-3-7-sonnet-20250219-v1:0` | us | |
 | `claude-haiku-4-5` | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | global | |
 | `bedrock/*` | 任意 Bedrock 模型 ID | 通配符（直接透传）| |
+| `gpt-5.5` | `openai.gpt-5.5` | us-east-2 (Mantle) | **新** OpenAI GPT-5.5 via Bedrock Mantle |
+| `gpt-5.4` | `openai.gpt-5.4` | us-east-2 (Mantle) | **新** OpenAI GPT-5.4 via Bedrock Mantle |
 
 **区域类型说明**:
 - **us** - Cross-Region Inference 端点，us-west-2 和 us-east-1 自动负载均衡
 - **global** - Global Inference 端点，跨多个区域全球负载均衡
 
+
+
+---
+
+## OpenAI GPT 模型（Bedrock Mantle）
+
+2026-06-01 GA，OpenAI GPT-5.5 和 GPT-5.4 通过 Amazon Bedrock Mantle 提供服务。
+
+| 模型名 | Model ID | 特点 |
+|--------|----------|------|
+| `gpt-5.5` | `openai.gpt-5.5` | 最强推理能力，支持 reasoning (high/medium/low) |
+| `gpt-5.4` | `openai.gpt-5.4` | 性价比优选，适合日常任务 |
+
+**注意事项**：
+- 这些模型仅支持 **Responses API** (`/v1/responses`)，不支持 `/chat/completions`
+- Endpoint: `https://bedrock-mantle.{region}.api.aws/openai/v1/responses`
+- 认证方式：**AWS SigV4**（与其他 Bedrock 模型一致，IRSA 自动签名）
+- 不支持的 tool types：`computer_use_preview`、`web_search`
+- 支持的 tool types：`function`、`mcp`、`custom`、`namespace`、`tool_search`
+- 需要 litellm >= 1.83.14（Docker 镜像已满足）
+
+**通过 LiteLLM 调用**：
+```python
+import litellm
+import os
+os.environ['AWS_REGION_NAME'] = 'us-east-2'
+
+# LiteLLM >= 1.83.14 原生支持
+response = litellm.responses(
+    model="bedrock/mantle/openai.gpt-5.5",
+    input="Your prompt here",
+)
+```
+
+**参考**：[AWS Blog - Get started with OpenAI GPT-5.5, GPT-5.4 models, and Codex on Amazon Bedrock](https://aws.amazon.com/blogs/aws/get-started-with-openai-gpt-5-5-gpt-5-4-models-and-codex-on-amazon-bedrock/)
 ---
 
 ## Fallback 降级链
