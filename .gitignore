@@ -43,3 +43,6 @@ docs/test-results-*
 data/bedrock-benchmark/
 scripts/bedrock-region-benchmark.py
 terraform/terraform.tfvars
+
+# 运行时凭据输出(含 master key,禁提交)
+output/

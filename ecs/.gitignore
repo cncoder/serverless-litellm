@@ -1,0 +1,8 @@
+# Terraform 运行产物(含真实资源 ID/state,禁提交)
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+tfplan
+crash.log

@@ -1,0 +1,171 @@
+# LiteLLM Gateway 配置 — serverless-litellm (fargate 分支)
+#
+# 设计原则：
+#   - 全部用 LiteLLM 官方原生 provider，零源码 patch
+#     · Claude 系 -> bedrock/converse/  (bedrock-runtime Converse API + SigV4)
+#     · GPT 系    -> bedrock_mantle/     (bedrock-mantle OpenAI 兼容端点 + SigV4)
+#   - 认证全走 ECS task role 的 IAM SigV4，零静态凭据，不使用任何 Bedrock API key / bearer token
+#   - 单 master key 认证，仅推理端点，不启用 Admin UI / RDS / 用量库
+#   - 同时暴露四种端点（配好 model_list 即自动可用，无需额外开关）：
+#       /v1/messages          Anthropic 格式  -> Claude Code
+#       /v1/chat/completions  OpenAI 格式     -> OpenClaw / Hermes / 通用 SDK
+#       /v1/responses         Responses API   -> Codex CLI
+#       /bedrock/...          Bedrock passthrough（原生 Bedrock SDK 直连）
+#
+# model ID 已用 `aws bedrock list-inference-profiles` + 真实 invoke 实测（账号 421283528656, 2026-07-27）
+# GPT 模型走 mantle Responses API，实测 sol/terra/luna 可用（gpt-5.5 当前区域受地域限制）
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # 说明：曾尝试用 pass_through_endpoints 把 GPT 流量原样透传到 Bedrock Mantle
+  # （想给 Codex CLI 提供 Mantle 原生 SSE 流以绕开其客户端解析 gap），但 LiteLLM 的
+  # passthrough 转发只支持静态 bearer header，不会用 task role 做 SigV4 —— 与"零静态
+  # 凭据"要求冲突（实测 passthrough 无 bearer 时 401 Invalid bearer token）。
+  # 结论：GPT 经 litellm 用纯 IAM SigV4 的原生路由（bedrock_mantle/ + aws_region_name）
+  # 已实测可用（/v1/responses 返回正常）；Codex CLI 若需纯 IAM，走直连 Bedrock Mantle
+  # （examples/codex-config.toml）。故此处不配 passthrough。
+
+litellm_settings:
+  # Bedrock 不支持的参数自动丢弃（如 CC 发来的 eager_input_streaming / context_management）
+  drop_params: true
+  # 用本地打包的 anthropic beta headers 配置，防止运行时远端拉取覆盖
+  # (beta headers 误报问题 LiteLLM v1.81.13+ 已官方修复，无需再 patch json)
+  num_retries: 3
+  request_timeout: 600
+  telemetry: false
+  json_logs: true
+  # 生产不打印请求/响应原文
+  log_raw_request_response: false
+  turn_off_message_logging: false
+  fallbacks:
+    - opus-4-8: [opus-4-6, sonnet-4-6]
+    - fable-5: [opus-4-8, opus-4-6]
+    - opus-4-6: [sonnet-4-6]
+    - sonnet-4-6: [opus-4-6]
+    - gpt-5.6-sol: [gpt-5.6-terra]
+    - gpt-5.6-terra: [gpt-5.6-luna]
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  timeout: 600
+  allowed_fails: 3
+  cooldown_time: 60
+  enable_pre_call_checks: true
+
+model_list:
+  # ============================================================
+  # Claude 系 — bedrock/ (bedrock-runtime, IAM task role)
+  # ============================================================
+  # --- Opus 4.8（默认主力）---
+  - model_name: opus-4-8
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-opus-4-8
+      aws_region_name: us-east-1
+    model_info: { id: opus-4-8 }
+  - model_name: opus-4-8-global
+    litellm_params:
+      model: bedrock/converse/global.anthropic.claude-opus-4-8
+      aws_region_name: us-east-1
+    model_info: { id: opus-4-8-global }
+
+  # --- Fable 5（provider data share 已在账号开启；reasoning 恒开、temperature 固定）---
+  - model_name: fable-5
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-fable-5
+      aws_region_name: us-east-1
+    model_info: { id: fable-5 }
+  - model_name: fable-5-global
+    litellm_params:
+      model: bedrock/converse/global.anthropic.claude-fable-5
+      aws_region_name: us-east-1
+    model_info: { id: fable-5-global }
+
+  # --- Opus 4.6 ---
+  - model_name: opus-4-6
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-opus-4-6-v1
+      aws_region_name: us-east-1
+    model_info: { id: opus-4-6 }
+
+  # --- Sonnet 4.6（小快模型 / subagent）---
+  - model_name: sonnet-4-6
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-sonnet-4-6
+      aws_region_name: us-east-1
+    model_info: { id: sonnet-4-6 }
+
+  # ============================================================
+  # GPT 系 — bedrock_mantle/ (Responses API, Bedrock API key)
+  # ------------------------------------------------------------
+  # 注意：LiteLLM v1.93.0 的 model cost map 尚未收录 bedrock_mantle 版 gpt-5.6，
+  # 门控 mantle_base_segment() 查不到条目会 fallback 到 /v1/responses（错误路径，
+  # 5.6 需 /openai/v1/responses）。官方设计支持用 model_info 覆盖能力标志
+  # （common_utils.py docstring: "overridable via register_model / proxy model_info"），
+  # 因此每个 5.6 条目显式声明 use_openai_responses_path/mode/supported_endpoints。
+  # 这是 JSON 配置覆盖，非源码 patch。gpt-5.5/5.4 已在 cost map 内，无需覆盖。
+  # ============================================================
+  - model_name: gpt-5.6-sol
+    litellm_params:
+      model: bedrock_mantle/openai.gpt-5.6-sol
+      aws_region_name: us-east-1
+    model_info:
+      id: gpt-5.6-sol
+      mode: responses
+      use_openai_responses_path: true
+      supported_endpoints: ["/v1/responses"]
+  - model_name: gpt-5.6-terra
+    litellm_params:
+      model: bedrock_mantle/openai.gpt-5.6-terra
+      aws_region_name: us-east-1
+    model_info:
+      id: gpt-5.6-terra
+      mode: responses
+      use_openai_responses_path: true
+      supported_endpoints: ["/v1/responses"]
+  - model_name: gpt-5.6-luna
+    litellm_params:
+      model: bedrock_mantle/openai.gpt-5.6-luna
+      aws_region_name: us-east-1
+    model_info:
+      id: gpt-5.6-luna
+      mode: responses
+      use_openai_responses_path: true
+      supported_endpoints: ["/v1/responses"]
+  # gpt-5.5 已在 cost map（use_openai_responses_path=True），仅 us-east-2/us-east-1 可用
+  - model_name: gpt-5.5
+    litellm_params:
+      model: bedrock_mantle/openai.gpt-5.5
+      aws_region_name: us-east-2
+    model_info: { id: gpt-5.5 }
+
+  # ============================================================
+  # 别名 — 兼容各 agent 默认模型名
+  # ============================================================
+  - model_name: opus
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-opus-4-8
+      aws_region_name: us-east-1
+    model_info: { id: alias-opus }
+  - model_name: sonnet
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-sonnet-4-6
+      aws_region_name: us-east-1
+    model_info: { id: alias-sonnet }
+  - model_name: claude-opus-4-8
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-opus-4-8
+      aws_region_name: us-east-1
+    model_info: { id: alias-claude-opus-4-8 }
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-sonnet-4-6
+      aws_region_name: us-east-1
+    model_info: { id: alias-claude-sonnet-4-6 }
+
+  # Bedrock 通配（passthrough / 任意其它 Bedrock 模型）
+  - model_name: bedrock/*
+    litellm_params:
+      model: bedrock/*
+      aws_region_name: us-east-1
+    model_info: { id: bedrock-wildcard }

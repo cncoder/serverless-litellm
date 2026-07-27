@@ -1,0 +1,56 @@
+# Codex CLI 接入 GPT-5.6（Bedrock Mantle）—— 两种方式，二选一
+#
+# 实测结论（2026-07-27, codex-cli 0.145.0, EC2 Amazon Linux 2023, LiteLLM v1.93.0）：
+#   · 网关侧 /v1/responses 用纯 IAM SigV4（task role）调 gpt-5.6-* 的 SSE 流经 curl 完全合规
+#     （response.created → response.completed 全套事件，实测返回正常）。
+#   · 但 Codex CLI 经 LiteLLM 时会报 "stream disconnected / high demand"：抓包确认 codex
+#     成功连上网关、请求完成、连接正常归还，是 codex 客户端对 litellm 转发的 responses SSE
+#     做严格解析时判定流提前结束 —— 这是 Codex CLI 对第三方 responses gateway 的已知兼容
+#     gap（GitHub 有多个 open issue），非网关缺陷。
+#   · LiteLLM 的 passthrough 转发到 Mantle 只支持静态 bearer，不做 task-role SigV4，
+#     与"零静态凭据"冲突，故不用。
+#
+# => Codex 要纯 IAM（无静态 key）又要能跑通，用【方式 B 直连】（已实测 CODEX_DIRECT_BEDROCK_OK）。
+#    其他 agent（Claude Code / OpenClaw / Hermes）经 LiteLLM 网关纯 IAM 全部实测通过。
+
+# ===========================================================================
+# 方式 A：经 LiteLLM 网关（统一 key/日志/路由；Codex 当前版本可能遇 stream disconnected）
+# ===========================================================================
+# model = "gpt-5.6-terra"
+# model_provider = "litellm"
+# model_context_window = 272000
+# approval_policy = "never"
+# sandbox_mode = "danger-full-access"
+# check_for_update_on_startup = false
+# web_search = "disabled"
+#
+# [features]
+# remote_models = false          # EC2 等无 ChatGPT 登录态环境：关掉，避免连 chatgpt.com 403
+#
+# [model_providers.litellm]
+# name = "litellm"
+# base_url = "https://<cloudfront-domain>/v1"
+# env_key = "LITELLM_GW_KEY"      # export LITELLM_GW_KEY="<master-key>"
+# wire_api = "responses"
+# supports_websockets = false
+# stream_idle_timeout_ms = 7200000
+# stream_max_retries = 5
+# request_max_retries = 4
+
+# ===========================================================================
+# 方式 B：Codex 直连 Bedrock Mantle（纯 IAM SigV4，零静态凭据）—— 推荐，已实测跑通
+# 前提：运行环境有 AWS 凭据链（EC2 instance profile / IRSA / SSO / 命名 profile）
+# 且该身份有 bedrock-mantle:CreateInference / CallWithBearerToken（AmazonBedrockMantleInferenceAccess）
+# ===========================================================================
+model = "openai.gpt-5.6-terra"     # 或 openai.gpt-5.6-sol / openai.gpt-5.6-luna
+model_provider = "amazon-bedrock"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+check_for_update_on_startup = false
+web_search = "disabled"
+
+[features]
+remote_models = false
+
+[model_providers.amazon-bedrock.aws]
+region = "us-east-1"

@@ -1,0 +1,12 @@
+{
+  "//": "Claude Code 接入 LiteLLM 网关。写入 ~/.claude/settings.json，替换 <...> 两处。已端到端实测通过。",
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://<cloudfront-domain>",
+    "ANTHROPIC_AUTH_TOKEN": "<master-key>",
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
+  "model": "opus-4-8",
+  "smallFastModel": "sonnet-4-6"
+}
