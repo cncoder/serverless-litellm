@@ -1,56 +1,57 @@
-# Codex CLI 接入 GPT-5.6（Bedrock Mantle）—— 两种方式，二选一
+# Codex CLI 接入 GPT-5.6（Bedrock Mantle）—— 经 LiteLLM 网关，已实测跑通
 #
-# 实测结论（2026-07-27, codex-cli 0.145.0, EC2 Amazon Linux 2023, LiteLLM v1.93.0）：
-#   · 网关侧 /v1/responses 用纯 IAM SigV4（task role）调 gpt-5.6-* 的 SSE 流经 curl 完全合规
-#     （response.created → response.completed 全套事件，实测返回正常）。
-#   · 但 Codex CLI 经 LiteLLM 时会报 "stream disconnected / high demand"：抓包确认 codex
-#     成功连上网关、请求完成、连接正常归还，是 codex 客户端对 litellm 转发的 responses SSE
-#     做严格解析时判定流提前结束 —— 这是 Codex CLI 对第三方 responses gateway 的已知兼容
-#     gap（GitHub 有多个 open issue），非网关缺陷。
-#   · LiteLLM 的 passthrough 转发到 Mantle 只支持静态 bearer，不做 task-role SigV4，
-#     与"零静态凭据"冲突，故不用。
+# ★ 关键（2026-07-27 实测）：Codex 0.145 对 gpt-5.6 默认走 "responses-lite" 协议变体，
+#   请求会带 additional_tools / reasoning.context=all_turns / x-openai-internal-codex-responses-lite
+#   等私有字段，LiteLLM/Mantle 不认 → 报 "stream disconnected / high demand"。
+#   解法：给 codex 一份 use_responses_lite=false 的 model catalog，让它发标准 Responses 请求。
+#   实测：纯文本 + 真实 shell 工具调用（printf → 读 stdout）均通过。
 #
-# => Codex 要纯 IAM（无静态 key）又要能跑通，用【方式 B 直连】（已实测 CODEX_DIRECT_BEDROCK_OK）。
-#    其他 agent（Claude Code / OpenClaw / Hermes）经 LiteLLM 网关纯 IAM 全部实测通过。
+# 部署前准备（在要跑 codex 的机器执行一次）：
+#   1) 装 codex：curl -fsSL https://chatgpt.com/codex/install.sh | sh
+#   2) 生成禁用 responses-lite 的 catalog（需 jq）：
+#      mkdir -p ~/.codex
+#      curl -fsSL https://raw.githubusercontent.com/openai/codex/rust-v0.145.0/codex-rs/models-manager/models.json \
+#        | jq '[.models[] | if (.slug|startswith("gpt-5.6")) then .use_responses_lite=false else . end] as $m | .models=$m' \
+#        > ~/.codex/models-standard-responses.json
+#   3) 用下面的 config.toml（model_catalog_json 用绝对路径）
+#   4) export OPENAI_API_KEY="<master-key>" 后运行 codex
 
-# ===========================================================================
-# 方式 A：经 LiteLLM 网关（统一 key/日志/路由；Codex 当前版本可能遇 stream disconnected）
-# ===========================================================================
-# model = "gpt-5.6-terra"
-# model_provider = "litellm"
-# model_context_window = 272000
-# approval_policy = "never"
-# sandbox_mode = "danger-full-access"
-# check_for_update_on_startup = false
-# web_search = "disabled"
-#
-# [features]
-# remote_models = false          # EC2 等无 ChatGPT 登录态环境：关掉，避免连 chatgpt.com 403
-#
-# [model_providers.litellm]
-# name = "litellm"
-# base_url = "https://<cloudfront-domain>/v1"
-# env_key = "LITELLM_GW_KEY"      # export LITELLM_GW_KEY="<master-key>"
-# wire_api = "responses"
-# supports_websockets = false
-# stream_idle_timeout_ms = 7200000
-# stream_max_retries = 5
-# request_max_retries = 4
-
-# ===========================================================================
-# 方式 B：Codex 直连 Bedrock Mantle（纯 IAM SigV4，零静态凭据）—— 推荐，已实测跑通
-# 前提：运行环境有 AWS 凭据链（EC2 instance profile / IRSA / SSO / 命名 profile）
-# 且该身份有 bedrock-mantle:CreateInference / CallWithBearerToken（AmazonBedrockMantleInferenceAccess）
-# ===========================================================================
-model = "openai.gpt-5.6-terra"     # 或 openai.gpt-5.6-sol / openai.gpt-5.6-luna
-model_provider = "amazon-bedrock"
+model = "gpt-5.6-terra"                # 或 gpt-5.6-sol / gpt-5.6-luna
+model_provider = "litellm-gw"
+model_catalog_json = "/home/<user>/.codex/models-standard-responses.json"  # 绝对路径
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 check_for_update_on_startup = false
-web_search = "disabled"
 
 [features]
-remote_models = false
+remote_models = false        # 无 ChatGPT 登录态环境（如 EC2）必须关，否则连 chatgpt.com 403 卡住
+plugins = false
+apps = false
 
-[model_providers.amazon-bedrock.aws]
-region = "us-east-1"
+[model_providers.litellm-gw]
+name = "LiteLLM Gateway"
+base_url = "https://<cloudfront-domain>/v1"
+env_key = "OPENAI_API_KEY"     # export OPENAI_API_KEY="<master-key>"
+wire_api = "responses"
+supports_websockets = false
+request_max_retries = 1
+stream_max_retries = 1
+stream_idle_timeout_ms = 300000
+
+# 验证：
+#   codex exec "print exactly: OK"                       # 纯文本
+#   codex exec "执行 printf hi 并只输出其 stdout"          # 真实工具调用
+#   两者正常返回即成功。
+
+# ===========================================================================
+# 备选：Codex 直连 Bedrock Mantle（纯 IAM SigV4，不经网关）
+# 不想经网关时用；需运行环境有 AWS 凭据链且身份具备 bedrock-mantle 权限
+# ===========================================================================
+# model = "openai.gpt-5.6-terra"
+# model_provider = "amazon-bedrock"
+# approval_policy = "never"
+# sandbox_mode = "danger-full-access"
+# [features]
+# remote_models = false
+# [model_providers.amazon-bedrock.aws]
+# region = "us-east-1"

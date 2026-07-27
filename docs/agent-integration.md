@@ -57,29 +57,58 @@
 
 验证：`claude --print "hello"`。切模型：`claude --model fable-5`。
 
-## 2. Codex CLI
+## 2. Codex CLI（经网关，已实测跑通含真实工具调用）
 
-Codex 走 Responses API。写入 `~/.codex/config.toml`：
+Codex 走 Responses API。**关键**：codex 0.145 对 gpt-5.6 默认走 "responses-lite" 协议变体
+（带 additional_tools / x-openai-internal-codex-responses-lite 等私有字段），LiteLLM/Mantle
+不认会报 "stream disconnected"。必须给 codex 一份 `use_responses_lite=false` 的 model catalog。
+
+准备（执行一次，需 jq）：
+
+```bash
+curl -fsSL https://chatgpt.com/codex/install.sh | sh      # 装 codex（若未装）
+mkdir -p ~/.codex
+curl -fsSL https://raw.githubusercontent.com/openai/codex/rust-v0.145.0/codex-rs/models-manager/models.json \
+  | jq '[.models[] | if (.slug|startswith("gpt-5.6")) then .use_responses_lite=false else . end] as $m | .models=$m' \
+  > ~/.codex/models-standard-responses.json
+```
+
+`~/.codex/config.toml`：
 
 ```toml
-model = "gpt-5.6-sol"
+model = "gpt-5.6-terra"
 model_provider = "litellm-gw"
+model_catalog_json = "/home/<user>/.codex/models-standard-responses.json"  # 绝对路径
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+check_for_update_on_startup = false
+
+[features]
+remote_models = false     # 无 ChatGPT 登录态环境（EC2 等）必须关，否则连 chatgpt.com 403
+plugins = false
+apps = false
 
 [model_providers.litellm-gw]
 name = "LiteLLM Gateway"
 base_url = "https://<cloudfront-domain>/v1"
-env_key = "LITELLM_GW_KEY"
+env_key = "OPENAI_API_KEY"
 wire_api = "responses"
+supports_websockets = false
+request_max_retries = 1
+stream_max_retries = 1
+stream_idle_timeout_ms = 300000
 ```
 
-导出 key 后启动：
+启动 + 验证：
 
 ```bash
-export LITELLM_GW_KEY="<master-key>"
-codex
+export OPENAI_API_KEY="<master-key>"
+codex exec "print exactly: OK"                    # 纯文本
+codex exec "执行 printf hi 并只输出其 stdout"       # 真实工具调用
 ```
 
-> 注意：Codex 内置模型选择器只认 OpenAI 广告给你账号的模型名。若要用网关的自定义别名（如 gpt-5.6-sol），可能需要补 `~/.codex/model-catalogs/`（见 Codex 官方文档 model catalog）。也可直接用 Codex 原生 `model_provider = "amazon-bedrock"` 直连 Bedrock Mantle，绕过网关。
+> 备选：不想经网关时，用 Codex 原生 `model_provider = "amazon-bedrock"` 直连 Bedrock Mantle
+> （纯 IAM，见 `examples/codex-config.toml` 备选段）。
 
 ## 3. OpenClaw
 
